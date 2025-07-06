@@ -13,13 +13,20 @@ const PORT = process.env.PORT || 3000;
 app.use(cors({
   origin: [
     'https://dev.azure.com',
-    'https://*.visualstudio.com',
-    'https://*.dev.azure.com',
-    'https://*.vsrm.visualstudio.com',
-    'https://localhost:*',
-    'https://127.0.0.1:*',
-    'http://localhost:*',
-    'http://127.0.0.1:*'
+    'https://visualstudio.com',
+    'https://tfs.visualstudio.com',
+    'https://vsrm.visualstudio.com',
+    'https://gopus.gallerycdn.vsassets.io',
+    'https://gallerycdn.vsassets.io',
+    'https://vsassets.io',
+    'https://localhost:3000',
+    'https://localhost:8080',
+    'https://127.0.0.1:3000',
+    'https://127.0.0.1:8080',
+    'http://localhost:3000',
+    'http://localhost:8080',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:8080'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
