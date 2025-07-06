@@ -757,17 +757,8 @@
                         return ticketResult;
                     }
                     
-                    // Get credentials
-                    const credentialsResult = await this.credentialService.getCredentials();
-                    if (!credentialsResult.success || !credentialsResult.data.apiKey || !credentialsResult.data.baseUrl) {
-                        return {
-                            success: false,
-                            error: 'ZEP API credentials not configured'
-                        };
-                    }
-                    
-                    const { apiKey, baseUrl, useProxy, proxyUrl } = credentialsResult.data;
-                    this.zepApi.setCredentials(apiKey, baseUrl, useProxy, proxyUrl);
+                    // No credentials needed - proxy mode handles everything
+                    console.log('🔧 Using proxy-only mode (no credentials needed)');
                     
                     // Fetch time entries
                     const timeEntries = await this.zepApi.getTimeEntriesForTickets(ticketResult.data);
@@ -787,17 +778,7 @@
             
             async testZepConnection() {
                 try {
-                    const credentialsResult = await this.credentialService.getCredentials();
-                    
-                    if (!credentialsResult.success || !credentialsResult.data.apiKey || !credentialsResult.data.baseUrl) {
-                        return {
-                            success: false,
-                            error: 'ZEP API credentials not configured'
-                        };
-                    }
-                    
-                    const { apiKey, baseUrl, useProxy, proxyUrl } = credentialsResult.data;
-                    this.zepApi.setCredentials(apiKey, baseUrl, useProxy, proxyUrl);
+                    console.log('🔧 Testing proxy connection (no credentials needed)');
                     
                     const testResult = await this.zepApi.testConnection();
                     
@@ -822,7 +803,9 @@
             }
             
             async hasStoredCredentials() {
-                return await this.credentialService.hasStoredCredentials();
+                // Always return true in proxy-only mode
+                console.log('🔧 Proxy-only mode: No local credentials needed');
+                return { success: true, data: true };
             }
             
             calculateTotalHours(timeEntries) {
@@ -914,23 +897,11 @@
                                 </div>
                             `);
                         } else {
-                            // Check if credentials are configured
-                            const hasCredentials = await zepIntegration.hasStoredCredentials();
+                            // No credentials needed in proxy-only mode
+                            console.log('🔧 Proxy-only mode: No credential check needed');
                             
-                            if (!hasCredentials) {
-                                renderContent(`
-                                    <div class="container">
-                                        <div class="error">
-                                            <h3>⚠️ ZEP Not Configured</h3>
-                                            <p>Please configure ZEP API settings in the organization settings.</p>
-                                            <p>Go to Organization Settings → Extensions → ZEP Time Tracker</p>
-                                        </div>
-                                    </div>
-                                `);
-                            } else {
-                                // Render main interface
-                                renderMainInterface(zepNumber, currentIST);
-                            }
+                            // Always render main interface
+                            renderMainInterface(zepNumber, currentIST);
                         }
                         
                         SDK.notifyLoadSucceeded();

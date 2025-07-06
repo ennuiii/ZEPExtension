@@ -10,44 +10,29 @@ import {
 } from '../types/ZepTypes';
 
 export class ZepApiService {
-  private apiKey: string = '';
-  private baseUrl: string = '';
-  private useProxy: boolean = true; // Default to proxy mode to avoid CORS issues
-  private proxyUrl: string = 'https://zepextension.onrender.com/api/zep';
-  
-  setCredentials(apiKey: string, baseUrl: string, useProxy: boolean = false, proxyUrl?: string): void {
-    this.apiKey = apiKey;
-    this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
-    this.useProxy = useProxy;
-    if (proxyUrl) {
-      this.proxyUrl = proxyUrl.replace(/\/$/, ''); // Remove trailing slash
-    }
-    
-    // Debug configuration
-    console.log('🔧 ZEP API Service Configuration Updated:');
-    console.log('  ├─ API Key:', this.apiKey ? `${this.apiKey.substring(0, 8)}...` : 'NOT SET');
-    console.log('  ├─ Base URL:', this.baseUrl || 'NOT SET');
-    console.log('  ├─ Use Proxy:', this.useProxy);
+  private readonly useProxy: boolean = true; // Always use proxy mode
+  private readonly proxyUrl: string = 'https://zepextension.onrender.com/api/zep';
+
+  constructor() {
+    console.log('🔧 ZEP API Service Configuration:');
+    console.log('  ├─ Mode: PROXY ONLY (credentials managed server-side)');
     console.log('  └─ Proxy URL:', this.proxyUrl);
-    
-    if (this.useProxy) {
-      console.log('🚨 PROXY MODE ENABLED - All requests will go through proxy server');
-      console.log('📡 Proxy Server URL:', this.proxyUrl);
-      console.log('🔀 Proxy will forward to:', this.baseUrl);
-    } else {
-      console.log('🚨 DIRECT MODE - Requests will go directly to ZEP API (may cause CORS issues)');
-      console.log('🎯 Direct API URL:', this.baseUrl);
-    }
+    console.log('🚨 PROXY MODE ENABLED - All requests go through proxy server');
+    console.log('🔑 Authentication handled by proxy server (no client credentials needed)');
+  }
+
+  // Legacy method for compatibility - now does nothing
+  setCredentials(apiKey?: string, baseUrl?: string, useProxy?: boolean, proxyUrl?: string): void {
+    console.log('⚠️ setCredentials called but ignored (proxy-only mode)');
+    console.log('🔄 Extension is configured for proxy-only mode');
+    console.log('🔑 All credentials are managed server-side');
   }
 
   /**
-   * Get the effective API URL based on proxy settings
+   * Get the effective API URL (always uses proxy)
    */
   private getApiUrl(endpoint: string): string {
-    if (this.useProxy) {
-      return `${this.proxyUrl}${endpoint}`;
-    }
-    return `${this.baseUrl}/api/v1${endpoint}`;
+    return `${this.proxyUrl}${endpoint}`;
   }
 
   /**
@@ -55,10 +40,6 @@ export class ZepApiService {
    * Based on ZEP API documentation: https://developer.zep.de/rest-documentation/attendances/list
    */
   async getTimeEntriesForTicket(ticketId: string): Promise<ZepTimeEntry[]> {
-    if (!this.apiKey || !this.baseUrl) {
-      throw new ZepApiConnectionError('ZEP API credentials not configured');
-    }
-
     try {
       // Construct the API endpoint
       const url = this.getApiUrl('/attendances');
@@ -68,36 +49,17 @@ export class ZepApiService {
         ticket_id: ticketId
       });
 
-      console.log(`🔗 ZEP API Request: ${url}?${params}`);
-      console.log(`📡 Using proxy: ${this.useProxy}`);
-      console.log(`🌐 Proxy URL: ${this.proxyUrl}`);
-      console.log(`🏢 Base URL: ${this.baseUrl}`);
-      console.log(`🔑 API Key: ${this.apiKey.substring(0, 8)}...`);
-      
-      if (this.useProxy) {
-        console.log(`🔄 PROXY MODE: Forwarding request through proxy server`);
-        console.log(`📤 Proxy will forward to: ${this.baseUrl}/api/v1${'/attendances'}`);
-      } else {
-        console.log(`🔄 DIRECT MODE: Making direct API call to ZEP server`);
-      }
+      console.log(`🔗 ZEP API Request (via proxy): ${url}?${params}`);
+      console.log(`🔄 PROXY MODE: All requests go through proxy server`);
+      console.log(`🔑 Authentication handled server-side`);
 
-      // Prepare headers for the request
+      // Prepare headers for the request (no authentication needed - handled by proxy)
       const headers: HeadersInit = {
-        'Authorization': `Bearer ${this.apiKey}`,
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       };
-
-      // When using proxy, send the base URL as a header
-      if (this.useProxy) {
-        headers['X-ZEP-Base-URL'] = this.baseUrl;
-        console.log(`📨 Adding X-ZEP-Base-URL header: ${this.baseUrl}`);
-      }
       
-      console.log(`📋 Request headers:`, Object.keys(headers).reduce((acc, key) => {
-        acc[key] = key === 'Authorization' ? 'Bearer ***' : headers[key];
-        return acc;
-      }, {} as any));
+      console.log(`📋 Request headers:`, headers);
 
       // Make the API request
       const response = await fetch(`${url}?${params}`, {
@@ -133,8 +95,7 @@ export class ZepApiService {
       
       // Check if it's a CORS error
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        const corsMessage = this.useProxy 
-          ? `CORS Error: Cannot connect to proxy server at ${this.proxyUrl}
+        const corsMessage = `CORS Error: Cannot connect to proxy server at ${this.proxyUrl}
 
 PROXY SERVER ISSUES:
 1. Check if proxy server is running at: ${this.proxyUrl}
@@ -143,20 +104,9 @@ PROXY SERVER ISSUES:
 4. Try testing proxy health: ${this.proxyUrl.replace('/api/zep', '/health')}
 
 Current configuration:
-- Proxy Mode: ${this.useProxy ? 'ENABLED' : 'DISABLED'}
+- Proxy Mode: ENABLED (always)
 - Proxy URL: ${this.proxyUrl}
-- ZEP Base URL: ${this.baseUrl}`
-          : `CORS Error: Cannot connect to ZEP API directly. 
-
-RECOMMENDED FIX: Enable proxy mode in extension settings!
-Proxy URL: https://zepextension.onrender.com/api/zep
-
-OTHER FIXES:
-1. Install a CORS browser extension (CORS Unblock for Chrome/Edge)
-2. Ask your ZEP admin to whitelist Azure DevOps domains
-3. Use browser with --disable-web-security flag (temporary)
-
-See CORS_WORKAROUND.md for detailed instructions.`;
+- Server-side authentication: Configured on proxy server`;
         throw new ZepCorsError(corsMessage);
       }
       
@@ -233,37 +183,20 @@ See CORS_WORKAROUND.md for detailed instructions.`;
   }
 
   /**
-   * Test API connection
+   * Test API connection (proxy-only mode)
    */
   async testConnection(): Promise<ApiCallResult<ZepUserInfo>> {
-    if (!this.apiKey || !this.baseUrl) {
-      return {
-        success: false,
-        error: 'API credentials not configured'
-      };
-    }
-
     try {
       // Test with a simple attendances call
       const url = this.getApiUrl('/attendances');
       
-      // Prepare headers for the request
+      // Prepare headers for the request (no authentication needed - handled by proxy)
       const headers: HeadersInit = {
-        'Authorization': `Bearer ${this.apiKey}`,
         'Accept': 'application/json'
       };
 
-      // When using proxy, send the base URL as a header
-      if (this.useProxy) {
-        headers['X-ZEP-Base-URL'] = this.baseUrl;
-        console.log(`🧪 TEST: Adding X-ZEP-Base-URL header: ${this.baseUrl}`);
-      }
+      console.log(`🧪 TEST: Testing proxy connection to ${url}`);
       
-      console.log(`🧪 TEST: Request headers:`, Object.keys(headers).reduce((acc, key) => {
-        acc[key] = key === 'Authorization' ? 'Bearer ***' : headers[key];
-        return acc;
-      }, {} as any));
-
       const response = await fetch(`${url}`, {
         method: 'GET',
         headers: headers,
@@ -273,7 +206,7 @@ See CORS_WORKAROUND.md for detailed instructions.`;
       if (!response.ok) {
         return {
           success: false,
-          error: `API test failed: ${response.status} ${response.statusText}`,
+          error: `Proxy test failed: ${response.status} ${response.statusText}`,
           details: { status: response.status }
         };
       }
@@ -284,17 +217,14 @@ See CORS_WORKAROUND.md for detailed instructions.`;
         data: {
           id: 'test-user',
           name: 'Connection successful',
-          email: `API connection verified ${this.useProxy ? '(via proxy)' : '(direct)'}`
+          email: 'API connection verified via proxy server'
         }
       };
     } catch (error) {
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        const corsMessage = this.useProxy 
-          ? 'CORS Error: Cannot connect to proxy server'
-          : 'CORS Error: Cannot connect to ZEP API directly. Try enabling proxy mode.';
         return {
           success: false,
-          error: corsMessage,
+          error: 'CORS Error: Cannot connect to proxy server',
           details: { type: 'cors' }
         };
       }
@@ -308,26 +238,22 @@ See CORS_WORKAROUND.md for detailed instructions.`;
   }
 
   /**
-   * Get current configuration
+   * Get current configuration (proxy-only mode)
    */
   getConfig(): ZepApiConfig | null {
-    if (!this.apiKey || !this.baseUrl) {
-      return null;
-    }
     return {
-      apiKey: this.apiKey,
-      baseUrl: this.baseUrl,
+      apiKey: 'server-managed',
+      baseUrl: 'server-managed',
       useProxy: this.useProxy,
       proxyUrl: this.proxyUrl
     };
   }
 
   /**
-   * Clear stored credentials
+   * Clear stored credentials (no-op in proxy-only mode)
    */
   clearCredentials(): void {
-    this.apiKey = '';
-    this.baseUrl = '';
-    this.useProxy = false;
+    console.log('⚠️ clearCredentials called but ignored (proxy-only mode)');
+    // No-op in proxy-only mode
   }
 } 

@@ -33,17 +33,18 @@ A CORS proxy server that acts as a bridge between the Azure DevOps extension and
 
 ### Environment Variables
 
-Create a `.env` file in the proxy-server directory:
+**IMPORTANT**: Create a `.env` file in the proxy-server directory with your ZEP API credentials:
 
 ```bash
+# Required: ZEP API Configuration
+ZEP_BASE_URL=https://www.zep-online.de/zepgeroldguelker/next
+ZEP_API_KEY=1ae0e45967a38b9ecbb22b249a90fcbd80ef986141c4ce21a04ed3d8d6a9ca2a
+
 # Server Port (default: 3000)
 PORT=3000
 
 # Environment
 NODE_ENV=development
-
-# Optional: Default ZEP Base URL (can be overridden by extension)
-ZEP_BASE_URL=https://your-zep-instance.com
 
 # Optional: Request timeout in milliseconds
 REQUEST_TIMEOUT=30000
@@ -52,9 +53,18 @@ REQUEST_TIMEOUT=30000
 DEBUG=true
 ```
 
+### Security Notes:
+- **Never commit your `.env` file to version control**
+- The API key is sensitive and should only be stored server-side
+- When deploying to render.com, set these as environment variables in the dashboard
+- The extension no longer needs any local credential configuration
+
 ### Extension Configuration
 
-The extension automatically sends the ZEP base URL as a header (`X-ZEP-Base-URL`) to the proxy server, so no additional configuration is needed.
+**No configuration needed!** The extension automatically uses proxy-only mode:
+- All requests go through the proxy server
+- Authentication is handled server-side
+- No local credentials or settings required in Azure DevOps
 
 ## API Endpoints
 

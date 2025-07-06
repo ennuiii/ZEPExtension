@@ -60,18 +60,29 @@ app.all('/api/zep/*', async (req, res) => {
   console.log('📍 Request URL:', req.originalUrl);
   console.log('🔧 HTTP Method:', req.method);
   console.log('🌐 Origin:', req.headers.origin || 'unknown');
-  console.log('🔑 Has Authorization:', !!req.headers.authorization);
+  console.log('🔑 Has Authorization from client:', !!req.headers.authorization);
   
   try {
     // Extract the ZEP API endpoint from the request path
     const zepEndpoint = req.path.replace('/api/zep', '');
     
-    // Get the ZEP base URL from request headers (sent by the extension)
-    const zepBaseUrl = req.headers['x-zep-base-url'] || process.env.ZEP_BASE_URL;
+    // Get credentials from environment variables (server-side config)
+    const zepBaseUrl = process.env.ZEP_BASE_URL;
+    const zepApiKey = process.env.ZEP_API_KEY;
+    
+    console.log('🔧 Server Configuration:');
+    console.log('  ├─ ZEP Base URL:', zepBaseUrl || 'NOT SET');
+    console.log('  └─ ZEP API Key:', zepApiKey ? `${zepApiKey.substring(0, 8)}...` : 'NOT SET');
     
     if (!zepBaseUrl) {
-      return res.status(400).json({
-        error: 'ZEP base URL not provided. Set X-ZEP-Base-URL header or ZEP_BASE_URL environment variable.'
+      return res.status(500).json({
+        error: 'Server configuration error: ZEP_BASE_URL environment variable not set.'
+      });
+    }
+    
+    if (!zepApiKey) {
+      return res.status(500).json({
+        error: 'Server configuration error: ZEP_API_KEY environment variable not set.'
       });
     }
 
@@ -95,13 +106,11 @@ app.all('/api/zep/*', async (req, res) => {
     const headers = {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
-      'User-Agent': 'ZEP-Proxy-Server/1.0'
+      'User-Agent': 'ZEP-Proxy-Server/1.0',
+      'Authorization': `Bearer ${zepApiKey}`
     };
 
-    // Pass through Authorization header
-    if (req.headers.authorization) {
-      headers['Authorization'] = req.headers.authorization;
-    }
+    console.log('🔑 Using server-side API key for ZEP authentication');
 
     // Make the request to ZEP API
     const fetchOptions = {

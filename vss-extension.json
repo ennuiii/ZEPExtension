@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "zep-time-tracker-browser",
   "publisher": "GOpus",
-      "version": "1.0.42",
+      "version": "1.0.43",
   "name": "ZEP Time Tracker (Browser Edition)",
   "description": "Direct browser-based ZEP time tracking integration for Azure DevOps",
   "public": false,
