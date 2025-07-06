@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>ZEP Time Tracker Settings</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"></script>
+    <script>
+        window.requirejs.config({
+            enforceDefine: true,
+            paths: {
+                'SDK': '../../lib/SDK/SDK.min'
+            }
+        });
+        
+        // Simple Credential Service for Settings
+        class CredentialService {
+            constructor() {
+                this.STORAGE_KEY = 'zep-credentials';
+            }
+            
+            async saveCredentials(apiKey, baseUrl, useProxy = false, proxyUrl = '') {
+                const credentials = {
+                    apiKey: apiKey,
+                    baseUrl: baseUrl,
+                    useProxy: useProxy,
+                    proxyUrl: proxyUrl,
+                    updatedAt: new Date().toISOString()
+                };
+                
+                try {
+                    // Try Azure DevOps Extension Data Service first
+                    const SDK = window.SDK || window.VSS;
+                    if (SDK) {
+                        const accessToken = await SDK.getAccessToken();
+                        const extensionContext = SDK.getExtensionContext();
+                        const dataService = await SDK.getService('ms.vss-features.extension-data-service');
+                        const dataManager = await dataService.getExtensionDataManager(extensionContext.id, accessToken);
+                        
+                        await dataManager.setValue(this.STORAGE_KEY, credentials, { scopeType: 'User' });
+                        console.log('Credentials saved to Extension Data Service');
+                    }
+                } catch (error) {
+                    console.warn('Failed to save to Extension Data Service:', error);
+                }
+                
+                // Also save to localStorage as fallback
+                try {
+                    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(credentials));
+                    console.log('Credentials saved to localStorage');
+                } catch (error) {
+                    console.warn('Failed to save to localStorage:', error);
+                    return {
+                        success: false,
+                        error: 'Failed to save credentials'
+                    };
+                }
+                
+                return {
+                    success: true,
+                    data: credentials
+                };
+            }
+            
+            async getCredentials() {
+                try {
+                    // Try Azure DevOps Extension Data Service first
+                    const SDK = window.SDK || window.VSS;
+                    if (SDK) {
+                        const accessToken = await SDK.getAccessToken();
+                        const extensionContext = SDK.getExtensionContext();
+                        const dataService = await SDK.getService('ms.vss-features.extension-data-service');
+                        const dataManager = await dataService.getExtensionDataManager(extensionContext.id, accessToken);
+                        
+                        const stored = await dataManager.getValue(this.STORAGE_KEY, { scopeType: 'User' });
+                        if (stored && stored.apiKey && stored.baseUrl) {
+                            return {
+                                success: true,
+                                data: stored
+                            };
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Failed to get credentials from Extension Data Service:', error);
+                }
+                
+                // Fallback to localStorage
+                try {
+                    const stored = localStorage.getItem(this.STORAGE_KEY);
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        if (parsed.apiKey && parsed.baseUrl) {
+                            return {
+                                success: true,
+                                data: parsed
+                            };
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Failed to get credentials from localStorage:', error);
+                }
+                
+                return {
+                    success: false,
+                    error: 'No credentials found'
+                };
+            }
+            
+            async clearCredentials() {
+                try {
+                    // Try Azure DevOps Extension Data Service first
+                    const SDK = window.SDK || window.VSS;
+                    if (SDK) {
+                        const accessToken = await SDK.getAccessToken();
+                        const extensionContext = SDK.getExtensionContext();
+                        const dataService = await SDK.getService('ms.vss-features.extension-data-service');
+                        const dataManager = await dataService.getExtensionDataManager(extensionContext.id, accessToken);
+                        
+                        await dataManager.setValue(this.STORAGE_KEY, null, { scopeType: 'User' });
+                        console.log('Credentials cleared from Extension Data Service');
+                    }
+                } catch (error) {
+                    console.warn('Failed to clear from Extension Data Service:', error);
+                }
+                
+                // Also clear from localStorage
+                try {
+                    localStorage.removeItem(this.STORAGE_KEY);
+                    console.log('Credentials cleared from localStorage');
+                } catch (error) {
+                    console.warn('Failed to clear from localStorage:', error);
+                }
+                
+                return {
+                    success: true
+                };
+            }
+        }
+        
+        // ZEP API Service for testing
+        class ZepApiService {
+            constructor() {
+                this.apiKey = '';
+                this.baseUrl = '';
+                this.useProxy = false;
+                this.proxyUrl = 'http://localhost:3000/api/zep';
+            }
+            
+            setCredentials(apiKey, baseUrl, useProxy = false, proxyUrl = '') {
+                this.apiKey = apiKey;
+                this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
+                this.useProxy = useProxy;
+                if (proxyUrl) {
+                    this.proxyUrl = proxyUrl.replace(/\/$/, ''); // Remove trailing slash
+                }
+            }
+            
+            getApiUrl(endpoint) {
+                if (this.useProxy) {
+                    return `${this.proxyUrl}${endpoint}`;
+                }
+                return `${this.baseUrl}/api/v1${endpoint}`;
+            }
+            
+            async testConnection() {
+                if (!this.apiKey || !this.baseUrl) {
+                    return {
+                        success: false,
+                        error: 'API credentials not configured'
+                    };
+                }
+                
+                try {
+                    const testUrl = this.getApiUrl('/attendances?limit=1');
+                    const headers = {
+                        'Authorization': `Bearer ${this.apiKey}`,
+                        'Accept': 'application/json'
+                    };
+                    
+                    console.log('🔍 ZEP API Test Connection Debug (Settings):');
+                    console.log('  Base URL:', this.baseUrl);
+                    console.log('  Using Proxy:', this.useProxy);
+                    console.log('  Proxy URL:', this.proxyUrl);
+                    console.log('  Test URL:', testUrl);
+                    console.log('  API Key (first 10 chars):', this.apiKey.substring(0, 10) + '...');
+                    console.log('  Headers:', {
+                        'Authorization': `Bearer ${this.apiKey.substring(0, 10)}...`,
+                        'Accept': headers['Accept']
+                    });
+                    
+                    // Test with a simple attendances call with limit 1
+                    const response = await fetch(testUrl, {
+                        method: 'GET',
+                        headers: headers,
+                        mode: 'cors'
+                    });
+                    
+                    console.log('📡 ZEP API Test Response Debug (Settings):');
+                    console.log('  Status:', response.status);
+                    console.log('  Status Text:', response.statusText);
+                    console.log('  Headers:', Object.fromEntries(response.headers.entries()));
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.log('  Error Response Body:', errorText);
+                        
+                        if (response.status === 401) {
+                            return {
+                                success: false,
+                                error: 'Invalid API key. Please check your credentials.'
+                            };
+                        } else if (response.status === 403) {
+                            return {
+                                success: false,
+                                error: 'Access forbidden. Check your API permissions.'
+                            };
+                        } else if (response.status === 404) {
+                            return {
+                                success: false,
+                                error: 'API endpoint not found. Check the base URL.'
+                            };
+                        }
+                        
+                        return {
+                            success: false,
+                            error: `API test failed: ${response.status} ${response.statusText}`
+                        };
+                    }
+                    
+                    const testData = await response.json();
+                    console.log('  Test Response Data:', testData);
+                    console.log('  Data Type:', typeof testData);
+                    console.log('  Data Keys:', Object.keys(testData));
+                    
+                    return {
+                        success: true,
+                        data: {
+                            message: 'Connection successful',
+                            status: 'API accessible',
+                            endpoint: testUrl
+                        }
+                    };
+                } catch (error) {
+                    console.error('🚨 ZEP API Test Connection Error Debug (Settings):');
+                    console.error('  Error Type:', error.constructor.name);
+                    console.error('  Error Message:', error.message);
+                    console.error('  Error Stack:', error.stack);
+                    
+                    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                        const corsMessage = this.useProxy 
+                            ? 'CORS Error: Cannot connect to proxy server. Make sure it is running on the correct port.'
+                            : 'CORS Error: Cannot connect to ZEP API directly. Try enabling proxy mode.';
+                        return {
+                            success: false,
+                            error: corsMessage
+                        };
+                    }
+                    
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    return {
+                        success: false,
+                        error: `Connection test failed: ${errorMessage}`
+                    };
+                }
+            }
+        }
+        
+        // Initialize services
+        let credentialService;
+        let zepApiService;
+        
+        window.requirejs(['SDK'], function (SDK) {
+            if (typeof SDK !== 'undefined') {
+                console.log("SDK is defined. Trying to initialize...");
+                
+                // Make SDK globally available
+                window.SDK = SDK;
+                
+                SDK.init({ loaded: false });
+                
+                SDK.ready().then(async () => {
+                    console.log("SDK is ready");
+                    
+                    // Initialize services
+                    credentialService = new CredentialService();
+                    zepApiService = new ZepApiService();
+                    
+                    // Get the organization context
+                    const context = SDK.getHost();
+                    const organization = context.name || 'default';
+                    console.log('Organization:', organization);
+                    
+                    // Show content and hide loading
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('content').style.display = 'block';
+                    
+                    // Load existing settings
+                    await loadSettings();
+                    
+                    // Set up event handlers
+                    document.getElementById('settingsForm').addEventListener('submit', async function(e) {
+                        e.preventDefault();
+                        await saveSettings();
+                    });
+                    
+                    document.getElementById('testButton').addEventListener('click', async function() {
+                        await testConnection();
+                    });
+                    
+                    document.getElementById('clearButton').addEventListener('click', async function() {
+                        await clearSettings();
+                    });
+                    
+                    // Add proxy checkbox event listener
+                    document.getElementById('useProxy').addEventListener('change', function() {
+                        toggleProxySettings();
+                    });
+                    
+                    SDK.notifyLoadSucceeded();
+                });
+            } else {
+                console.log('SDK is not defined');
+                document.getElementById('loading').innerHTML = '<div class="error">Failed to load Azure DevOps SDK</div>';
+            }
+        });
+        
+        async function loadSettings() {
+            try {
+                const result = await credentialService.getCredentials();
+                
+                if (result.success) {
+                    const credentials = result.data;
+                    document.getElementById('baseUrl').value = credentials.baseUrl || '';
+                    document.getElementById('apiKey').value = credentials.apiKey || '';
+                    document.getElementById('useProxy').checked = credentials.useProxy || false;
+                    document.getElementById('proxyUrl').value = credentials.proxyUrl || 'http://localhost:3000/api/zep';
+                    
+                    // Toggle proxy settings visibility
+                    toggleProxySettings();
+                    
+                    if (credentials.updatedAt) {
+                        document.getElementById('lastUpdated').textContent = 
+                            `Last updated: ${new Date(credentials.updatedAt).toLocaleString()}`;
+                    }
+                    
+                    updateConnectionStatus('ready', 'Settings loaded - ready to test connection');
+                    console.log('Settings loaded successfully');
+                } else {
+                    updateConnectionStatus('not-configured', 'No saved settings found');
+                    console.log('No existing settings found');
+                }
+            } catch (error) {
+                console.error('Error loading settings:', error);
+                showStatus('Error loading settings: ' + error.message, 'error');
+            }
+        }
+        
+        async function saveSettings() {
+            const baseUrl = document.getElementById('baseUrl').value.trim();
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const useProxy = document.getElementById('useProxy').checked;
+            const proxyUrl = document.getElementById('proxyUrl').value.trim();
+            
+            if (!baseUrl || !apiKey) {
+                showStatus('Please enter both Base URL and API Key', 'error');
+                return;
+            }
+            
+            if (useProxy && !proxyUrl) {
+                showStatus('Please enter a Proxy Server URL when using proxy mode', 'error');
+                return;
+            }
+            
+            // Validate URL format
+            try {
+                new URL(baseUrl);
+            } catch (error) {
+                showStatus('Please enter a valid URL for the Base URL', 'error');
+                return;
+            }
+            
+            try {
+                const result = await credentialService.saveCredentials(apiKey, baseUrl, useProxy, proxyUrl);
+                
+                if (result.success) {
+                    showStatus('Settings saved successfully!', 'success');
+                    updateConnectionStatus('saved', 'Settings saved - ready to test connection');
+                    
+                    if (result.data.updatedAt) {
+                        document.getElementById('lastUpdated').textContent = 
+                            `Last updated: ${new Date(result.data.updatedAt).toLocaleString()}`;
+                    }
+                    
+                    console.log('Settings saved successfully');
+                } else {
+                    showStatus('Failed to save settings: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                showStatus('Error saving settings: ' + error.message, 'error');
+            }
+        }
+        
+        async function testConnection() {
+            const baseUrl = document.getElementById('baseUrl').value.trim();
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const useProxy = document.getElementById('useProxy').checked;
+            const proxyUrl = document.getElementById('proxyUrl').value.trim();
+            
+            if (!baseUrl || !apiKey) {
+                showStatus('Please enter both Base URL and API Key before testing', 'error');
+                return;
+            }
+            
+            if (useProxy && !proxyUrl) {
+                showStatus('Please enter a Proxy Server URL when using proxy mode', 'error');
+                return;
+            }
+            
+            updateConnectionStatus('testing', 'Testing connection...');
+            
+            const testButton = document.getElementById('testButton');
+            testButton.disabled = true;
+            testButton.textContent = '⏳ Testing...';
+            
+            try {
+                zepApiService.setCredentials(apiKey, baseUrl, useProxy, proxyUrl);
+                const result = await zepApiService.testConnection();
+                
+                if (result.success) {
+                    updateConnectionStatus('success', `✅ Connection successful! ${result.data.message}`);
+                    showStatus('Connection test passed!', 'success');
+                } else {
+                    updateConnectionStatus('error', `❌ Connection failed: ${result.error}`);
+                    showStatus('Connection test failed: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Test connection error:', error);
+                updateConnectionStatus('error', `❌ Test failed: ${error.message}`);
+                showStatus('Test failed: ' + error.message, 'error');
+            } finally {
+                testButton.disabled = false;
+                testButton.textContent = '🔧 Test Connection';
+            }
+        }
+        
+        async function clearSettings() {
+            if (!confirm('Are you sure you want to clear all ZEP API settings? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const result = await credentialService.clearCredentials();
+                
+                if (result.success) {
+                    // Clear form fields
+                    document.getElementById('baseUrl').value = '';
+                    document.getElementById('apiKey').value = '';
+                    document.getElementById('useProxy').checked = false;
+                    document.getElementById('proxyUrl').value = 'http://localhost:3000/api/zep';
+                    document.getElementById('lastUpdated').textContent = '';
+                    
+                    // Hide proxy settings
+                    toggleProxySettings();
+                    
+                    updateConnectionStatus('cleared', 'Settings cleared');
+                    showStatus('Settings cleared successfully!', 'success');
+                    console.log('Settings cleared successfully');
+                } else {
+                    showStatus('Failed to clear settings', 'error');
+                }
+            } catch (error) {
+                console.error('Error clearing settings:', error);
+                showStatus('Error clearing settings: ' + error.message, 'error');
+            }
+        }
+        
+        function updateConnectionStatus(status, message) {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = 'connection-status ' + status;
+        }
+        
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status-message ' + type;
+            statusDiv.style.display = 'block';
+            
+            setTimeout(function() {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+        
+        function toggleProxySettings() {
+            const useProxy = document.getElementById('useProxy').checked;
+            const proxySettings = document.getElementById('proxySettings');
+            proxySettings.style.display = useProxy ? 'block' : 'none';
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            border-bottom: 2px solid #0078d4;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #0078d4;
+            margin: 0;
+            font-size: 28px;
+        }
+        
+        .header p {
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #444;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #0078d4;
+        }
+        
+        .form-group .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .connection-status {
+            padding: 12px;
+            border-radius: 4px;
+            font-weight: 500;
+            margin-top: 5px;
+        }
+        
+        .connection-status.not-configured {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            color: #6c757d;
+        }
+        
+        .connection-status.ready {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        
+        .connection-status.saved {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
+        .connection-status.testing {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        
+        .connection-status.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .connection-status.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .connection-status.cleared {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            color: #6c757d;
+        }
+        
+        .button-group {
+            margin-top: 30px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .button.primary {
+            background-color: #0078d4;
+            color: white;
+        }
+        
+        .button.primary:hover:not(:disabled) {
+            background-color: #005a9e;
+        }
+        
+        .button.secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .button.secondary:hover:not(:disabled) {
+            background-color: #5a6268;
+        }
+        
+        .button.danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .button.danger:hover:not(:disabled) {
+            background-color: #c82333;
+        }
+        
+        .status-message {
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .status-message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .loading::after {
+            content: "...";
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: ""; }
+            40% { content: "."; }
+            60% { content: ".."; }
+            80%, 100% { content: "..."; }
+        }
+
+        .content {
+            display: none;
+        }
+        
+        .last-updated {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            font-style: italic;
+        }
+        
+        .info-section {
+            background-color: #f0f8ff;
+            border: 1px solid #b8daff;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .info-section h3 {
+            color: #004085;
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+        
+        .info-section p {
+            color: #004085;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .info-section ul {
+            color: #004085;
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .info-section li {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .version-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading" id="loading">
+        Loading ZEP Time Tracker Settings
+    </div>
+    
+    <div class="content" id="content">
+        <div class="container">
+            <div class="header">
+                <h1>🕐 ZEP Time Tracker Settings</h1>
+                <p>Configure your organization's ZEP API connection</p>
+                <p class="version-info">Version 1.0.34</p>
+            </div>
+            
+            <div class="info-section">
+                <h3>📋 Setup Instructions</h3>
+                <p>To configure the ZEP Time Tracker extension, you'll need:</p>
+                <ul>
+                    <li><strong>Base URL:</strong> Your ZEP instance URL (e.g., https://your-company.zep.de)</li>
+                    <li><strong>API Key:</strong> A valid ZEP API token with attendances read permissions</li>
+                </ul>
+                <p>Contact your ZEP administrator if you need help obtaining these credentials.</p>
+            </div>
+            
+            <form id="settingsForm">
+                <div class="form-group">
+                    <label for="baseUrl">ZEP Base URL</label>
+                    <input type="url" id="baseUrl" name="baseUrl" placeholder="https://your-company.zep.de" required>
+                    <div class="help-text">Enter the base URL of your ZEP instance (without /api path)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="apiKey">API Key</label>
+                    <input type="password" id="apiKey" name="apiKey" placeholder="Enter your ZEP API key" required>
+                    <div class="help-text">Your secure API key for authentication. This will be stored securely in Azure DevOps.</div>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="useProxy" name="useProxy"> Use CORS Proxy Server
+                    </label>
+                    <div class="help-text">Enable if you're experiencing CORS errors when connecting directly to ZEP API</div>
+                </div>
+                
+                <div class="form-group proxy-settings" id="proxySettings" style="display: none;">
+                    <label for="proxyUrl">Proxy Server URL</label>
+                    <input type="url" id="proxyUrl" name="proxyUrl" placeholder="http://localhost:3000/api/zep" value="http://localhost:3000/api/zep">
+                    <div class="help-text">URL of your CORS proxy server (must be running before testing)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="connectionStatus">Connection Status</label>
+                    <div id="connectionStatus" class="connection-status not-configured">
+                        Not configured yet
+                    </div>
+                </div>
+                
+                <div class="last-updated" id="lastUpdated"></div>
+                
+                <div class="button-group">
+                    <button type="submit" class="button primary">💾 Save Settings</button>
+                    <button type="button" class="button secondary" id="testButton">🔧 Test Connection</button>
+                    <button type="button" class="button danger" id="clearButton">🗑️ Clear Settings</button>
+                </div>
+            </form>
+            
+            <div id="statusMessage" class="status-message"></div>
+        </div>
+    </div>
+</body>
+</html> 

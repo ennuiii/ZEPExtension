@@ -1,0 +1,49 @@
+{
+  "name": "zep-time-tracker-browser",
+  "version": "1.0.27",
+  "description": "Browser-only Azure DevOps extension for ZEP time tracking integration",
+  "main": "src/workitem-group/workitem-group.html",
+  "scripts": {
+    "build": "webpack --mode=production",
+    "build:dev": "webpack --mode=development",
+    "package": "npm run build && tfx extension create --manifest-globs vss-extension.json",
+    "package:dev": "npm run build:dev && tfx extension create --manifest-globs vss-extension.json --rev-version"
+  },
+  "keywords": [
+    "azure-devops",
+    "extension",
+    "zep",
+    "time-tracking",
+    "typescript",
+    "react"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@typescript-eslint/eslint-plugin": "^6.13.2",
+    "@typescript-eslint/parser": "^6.13.2",
+    "css-loader": "^6.8.1",
+    "eslint": "^8.55.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "html-webpack-plugin": "^5.5.4",
+    "rimraf": "^5.0.5",
+    "style-loader": "^3.3.3",
+    "tfx-cli": "^0.17.0",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^4.15.1"
+  },
+  "dependencies": {
+    "ajv": "8.12.0",
+    "azure-devops-extension-api": "^4.234.0",
+    "azure-devops-extension-sdk": "^4.0.2",
+    "azure-devops-ui": "^2.167.58",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

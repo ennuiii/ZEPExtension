@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ZEP Time Tracker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"></script>
+    <script>
+        window.requirejs.config({
+            enforceDefine: true,
+            paths: {
+                'SDK': '../../lib/SDK/SDK.min'
+            }
+        });
+        
+        // Add error handling for RequireJS
+        window.requirejs.onError = function (err) {
+            console.error('RequireJS Error:', err);
+            console.error('Error type:', err.requireType);
+            console.error('Error modules:', err.requireModules);
+            document.getElementById('loading').innerHTML = '<div class="error">Failed to load SDK: ' + err.message + '</div>';
+        };
+    </script>
+</head>
+<body>
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div>Loading ZEP Time Tracker...</div>
+    </div>
+    
+    <div class="content" id="content" style="display: none;">
+        <!-- Content will be loaded here -->
+    </div>
+
+    <script>
+        // Simple ZEP API Service
+        class ZepApiService {
+            constructor() {
+                this.apiKey = '';
+                this.baseUrl = '';
+            }
+            
+            setCredentials(apiKey, baseUrl) {
+                this.apiKey = apiKey;
+                this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
+            }
+            
+            async getTimeEntriesForTicket(ticketId) {
+                if (!this.apiKey || !this.baseUrl) {
+                    throw new Error('ZEP API credentials not configured');
+                }
+                
+                // Try JSONP first, fallback to fetch
+                try {
+                    console.log('🔍 Attempting JSONP request...');
+                    return await this.getTimeEntriesWithJsonp(ticketId);
+                } catch (jsonpError) {
+                    console.log('❌ JSONP failed, falling back to fetch:', jsonpError.message);
+                    return await this.getTimeEntriesWithFetch(ticketId);
+                }
+            }
+            
+            async getTimeEntriesWithJsonp(ticketId) {
+                return new Promise((resolve, reject) => {
+                    // Create unique callback name
+                    const callbackName = 'zepCallback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    
+                    // Construct the API endpoint
+                    const url = `${this.baseUrl}/attendances`;
+                    const params = new URLSearchParams({
+                        ticket_id: ticketId,
+                        callback: callbackName,
+                        // Some APIs support auth via query param for JSONP
+                        access_token: this.apiKey
+                    });
+                    
+                    const fullUrl = `${url}?${params}`;
+                    
+                    console.log('🔍 ZEP JSONP Request Debug:');
+                    console.log('  Base URL:', this.baseUrl);
+                    console.log('  Ticket ID:', ticketId);
+                    console.log('  Callback:', callbackName);
+                    console.log('  Full URL:', fullUrl);
+                    
+                    // Set up callback function
+                    window[callbackName] = (data) => {
+                        console.log('✅ JSONP callback received data:', data);
+                        
+                        // Clean up
+                        delete window[callbackName];
+                        document.head.removeChild(script);
+                        
+                        try {
+                            const transformedData = this.transformZepResponse(data, ticketId);
+                            resolve(transformedData);
+                        } catch (error) {
+                            reject(error);
+                        }
+                    };
+                    
+                    // Create script element
+                    const script = document.createElement('script');
+                    script.src = fullUrl;
+                    script.onerror = () => {
+                        console.error('❌ JSONP script failed to load');
+                        delete window[callbackName];
+                        document.head.removeChild(script);
+                        reject(new Error('JSONP request failed - script could not be loaded'));
+                    };
+                    
+                    // Set timeout for JSONP request
+                    const timeout = setTimeout(() => {
+                        console.error('⏰ JSONP request timed out');
+                        delete window[callbackName];
+                        if (script.parentNode) {
+                            document.head.removeChild(script);
+                        }
+                        reject(new Error('JSONP request timed out'));
+                    }, 15000); // 15 second timeout
+                    
+                    // Override callback to clear timeout
+                    const originalCallback = window[callbackName];
+                    window[callbackName] = (data) => {
+                        clearTimeout(timeout);
+                        originalCallback(data);
+                    };
+                    
+                    // Add script to head to make the request
+                    document.head.appendChild(script);
+                });
+            }
+            
+            async getTimeEntriesWithFetch(ticketId) {
+                try {
+                    // Construct the API endpoint - base URL already includes /api/v1
+                    const url = `${this.baseUrl}/attendances`;
+                    
+                    // Build query parameters - using ticket_id as per actual API
+                    const params = new URLSearchParams({
+                        ticket_id: ticketId
+                    });
+                    
+                    const fullUrl = `${url}?${params}`;
+                    
+                    // Debug logging
+                    console.log('🔍 ZEP API Fetch Request Debug:');
+                    console.log('  Base URL:', this.baseUrl);
+                    console.log('  Endpoint:', url);
+                    console.log('  Ticket ID:', ticketId);
+                    console.log('  Query Params:', params.toString());
+                    console.log('  Full URL:', fullUrl);
+                    console.log('  API Key (first 10 chars):', this.apiKey.substring(0, 10) + '...');
+                    
+                    const headers = {
+                        'Authorization': `Bearer ${this.apiKey}`,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    };
+                    
+                    console.log('  Headers:', {
+                        'Authorization': `Bearer ${this.apiKey.substring(0, 10)}...`,
+                        'Accept': headers['Accept'],
+                        'Content-Type': headers['Content-Type']
+                    });
+                    
+                    // Make the API request
+                    const response = await fetch(fullUrl, {
+                        method: 'GET',
+                        headers: headers,
+                        mode: 'cors',
+                        credentials: 'omit'
+                    });
+                    
+                    console.log('📡 ZEP API Response Debug:');
+                    console.log('  Status:', response.status);
+                    console.log('  Status Text:', response.statusText);
+                    console.log('  Headers:', Object.fromEntries(response.headers.entries()));
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.log('  Error Response Body:', errorText);
+                        
+                        if (response.status === 401) {
+                            throw new Error('Invalid API key. Please check your ZEP credentials.');
+                        } else if (response.status === 403) {
+                            throw new Error('Access forbidden. Check your API permissions.');
+                        } else if (response.status === 404) {
+                            throw new Error('API endpoint not found. Check the base URL.');
+                        }
+                        
+                        throw new Error(`ZEP API error (${response.status}): ${errorText}`);
+                    }
+                    
+                    const data = await response.json();
+                    console.log('  Response Data:', data);
+                    console.log('  Data Type:', typeof data);
+                    console.log('  Data Keys:', Object.keys(data));
+                    
+                    if (data.data && Array.isArray(data.data)) {
+                        console.log('  Entries Count:', data.data.length);
+                        if (data.data.length > 0) {
+                            console.log('  First Entry Sample:', data.data[0]);
+                        }
+                    }
+                    
+                    // Transform ZEP API response to our format
+                    const transformedData = this.transformZepResponse(data, ticketId);
+                    console.log('  Transformed Data:', transformedData);
+                    
+                    return transformedData;
+                    
+                } catch (error) {
+                    console.error('🚨 ZEP API Error Debug:');
+                    console.error('  Error Type:', error.constructor.name);
+                    console.error('  Error Message:', error.message);
+                    console.error('  Error Stack:', error.stack);
+                    
+                    // Check if it's a CORS error
+                    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                        const corsError = new Error(
+                            'CORS Error: Cannot connect to ZEP API directly. \n\n' +
+                            'QUICK FIXES:\n' +
+                            '1. Install a CORS browser extension (CORS Unblock for Chrome/Edge)\n' +
+                            '2. Ask your ZEP admin to whitelist Azure DevOps domains\n' +
+                            '3. Use browser with --disable-web-security flag (temporary)\n\n' +
+                            'See CORS_WORKAROUND.md for detailed instructions.'
+                        );
+                        console.error('  CORS Error Details:', corsError.message);
+                        throw corsError;
+                    }
+                    
+                    throw error;
+                }
+            }
+            
+            async getTimeEntriesForTickets(ticketIds) {
+                const allEntries = [];
+                
+                for (const ticketId of ticketIds) {
+                    try {
+                        const entries = await this.getTimeEntriesForTicket(ticketId.trim());
+                        allEntries.push(...entries);
+                    } catch (error) {
+                        console.error(`Failed to fetch entries for ticket ${ticketId}:`, error);
+                        // Continue with other tickets even if one fails
+                    }
+                }
+                
+                return allEntries;
+            }
+            
+            transformZepResponse(data, ticketId) {
+                // The actual API returns data array, not items
+                if (!data || !Array.isArray(data.data)) {
+                    return [];
+                }
+                
+                return data.data.map((item) => ({
+                    id: item.id.toString(),
+                    ticketId: ticketId,
+                    employeeId: item.employee_id,
+                    employeeName: item.employee_id, // ZEP API doesn't provide name in this endpoint
+                    date: item.date,
+                    startTime: item.from,
+                    endTime: item.to,
+                    duration: item.duration, // ZEP API provides duration directly
+                    description: item.note || '',
+                    project: item.project_id?.toString() || ticketId,
+                    activity: item.activity_id || '',
+                    billable: item.billable || false
+                }));
+            }
+            
+            async testConnection() {
+                if (!this.apiKey || !this.baseUrl) {
+                    return {
+                        success: false,
+                        error: 'API credentials not configured'
+                    };
+                }
+                
+                // Try JSONP first, fallback to fetch
+                try {
+                    console.log('🔍 Testing connection with JSONP...');
+                    await this.testConnectionWithJsonp();
+                    return {
+                        success: true,
+                        message: 'Connection successful (JSONP)'
+                    };
+                } catch (jsonpError) {
+                    console.log('❌ JSONP test failed, falling back to fetch:', jsonpError.message);
+                    return await this.testConnectionWithFetch();
+                }
+            }
+            
+            async testConnectionWithJsonp() {
+                return new Promise((resolve, reject) => {
+                    const callbackName = 'zepTestCallback_' + Date.now();
+                    
+                    const params = new URLSearchParams({
+                        callback: callbackName,
+                        access_token: this.apiKey
+                    });
+                    
+                    const testUrl = `${this.baseUrl}/attendances?${params}`;
+                    
+                    console.log('🔍 ZEP JSONP Test Connection Debug:');
+                    console.log('  Base URL:', this.baseUrl);
+                    console.log('  Test URL:', testUrl);
+                    console.log('  Callback:', callbackName);
+                    
+                    window[callbackName] = (data) => {
+                        console.log('✅ JSONP test callback received:', data);
+                        delete window[callbackName];
+                        document.head.removeChild(script);
+                        resolve(data);
+                    };
+                    
+                    const script = document.createElement('script');
+                    script.src = testUrl;
+                    script.onerror = () => {
+                        delete window[callbackName];
+                        document.head.removeChild(script);
+                        reject(new Error('JSONP test connection failed'));
+                    };
+                    
+                    const timeout = setTimeout(() => {
+                        delete window[callbackName];
+                        if (script.parentNode) {
+                            document.head.removeChild(script);
+                        }
+                        reject(new Error('JSONP test connection timed out'));
+                    }, 10000);
+                    
+                    const originalCallback = window[callbackName];
+                    window[callbackName] = (data) => {
+                        clearTimeout(timeout);
+                        originalCallback(data);
+                    };
+                    
+                    document.head.appendChild(script);
+                });
+            }
+            
+            async testConnectionWithFetch() {
+                try {
+                    const testUrl = `${this.baseUrl}/attendances`;
+                    const headers = {
+                        'Authorization': `Bearer ${this.apiKey}`,
+                        'Accept': 'application/json'
+                    };
+                    
+                    console.log('🔍 ZEP API Fetch Test Connection Debug:');
+                    console.log('  Base URL:', this.baseUrl);
+                    console.log('  Test URL:', testUrl);
+                    console.log('  API Key (first 10 chars):', this.apiKey.substring(0, 10) + '...');
+                    console.log('  Headers:', {
+                        'Authorization': `Bearer ${this.apiKey.substring(0, 10)}...`,
+                        'Accept': headers['Accept']
+                    });
+                    
+                    // Test with a simple attendances call with limit 1
+                    const response = await fetch(testUrl, {
+                        method: 'GET',
+                        headers: headers,
+                        mode: 'cors'
+                    });
+                    
+                    console.log('📡 ZEP API Test Response Debug:');
+                    console.log('  Status:', response.status);
+                    console.log('  Status Text:', response.statusText);
+                    console.log('  Headers:', Object.fromEntries(response.headers.entries()));
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.log('  Error Response Body:', errorText);
+                        
+                        return {
+                            success: false,
+                            error: `API test failed: ${response.status} ${response.statusText}`
+                        };
+                    }
+                    
+                    const testData = await response.json();
+                    console.log('  Test Response Data:', testData);
+                    
+                    return {
+                        success: true,
+                        data: {
+                            id: 'test-user',
+                            name: 'Connection successful',
+                            email: 'API connection verified'
+                        }
+                    };
+                } catch (error) {
+                    console.error('🚨 ZEP API Test Connection Error Debug:');
+                    console.error('  Error Type:', error.constructor.name);
+                    console.error('  Error Message:', error.message);
+                    console.error('  Error Stack:', error.stack);
+                    
+                    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                        return {
+                            success: false,
+                            error: 'CORS Error: Cannot connect to ZEP API from browser'
+                        };
+                    }
+                    
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    return {
+                        success: false,
+                        error: `Connection test failed: ${errorMessage}`
+                    };
+                }
+            }
+        }
+        
+        // Simple Credential Service
+        class CredentialService {
+            constructor() {
+                this.STORAGE_KEY = 'zep-credentials';
+            }
+            
+            async getCredentials() {
+                try {
+                    // Try Azure DevOps Extension Data Service first
+                    const SDK = window.SDK || window.VSS;
+                    if (SDK) {
+                        const accessToken = await SDK.getAccessToken();
+                        const extensionContext = SDK.getExtensionContext();
+                        const dataService = await SDK.getService('ms.vss-features.extension-data-service');
+                        const dataManager = await dataService.getExtensionDataManager(extensionContext.id, accessToken);
+                        
+                        const stored = await dataManager.getValue(this.STORAGE_KEY, { scopeType: 'User' });
+                        if (stored && stored.apiKey && stored.baseUrl) {
+                            return {
+                                success: true,
+                                data: stored
+                            };
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Failed to get credentials from Extension Data Service:', error);
+                }
+                
+                // Fallback to localStorage
+                try {
+                    const stored = localStorage.getItem(this.STORAGE_KEY);
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        if (parsed.apiKey && parsed.baseUrl) {
+                            return {
+                                success: true,
+                                data: parsed
+                            };
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Failed to get credentials from localStorage:', error);
+                }
+                
+                return {
+                    success: false,
+                    error: 'No credentials found'
+                };
+            }
+            
+            async saveCredentials(apiKey, baseUrl) {
+                const credentials = {
+                    apiKey: apiKey,
+                    baseUrl: baseUrl,
+                    updatedAt: new Date().toISOString()
+                };
+                
+                try {
+                    // Try Azure DevOps Extension Data Service first
+                    const SDK = window.SDK || window.VSS;
+                    if (SDK) {
+                        const accessToken = await SDK.getAccessToken();
+                        const extensionContext = SDK.getExtensionContext();
+                        const dataService = await SDK.getService('ms.vss-features.extension-data-service');
+                        const dataManager = await dataService.getExtensionDataManager(extensionContext.id, accessToken);
+                        
+                        await dataManager.setValue(this.STORAGE_KEY, credentials, { scopeType: 'User' });
+                        return {
+                            success: true,
+                            data: undefined
+                        };
+                    }
+                } catch (error) {
+                    console.warn('Failed to save credentials to Extension Data Service:', error);
+                }
+                
+                // Fallback to localStorage
+                try {
+                    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(credentials));
+                    return {
+                        success: true,
+                        data: undefined
+                    };
+                } catch (error) {
+                    return {
+                        success: false,
+                        error: `Failed to save credentials: ${error.message}`
+                    };
+                }
+            }
+            
+            async clearCredentials() {
+                try {
+                    // Try Azure DevOps Extension Data Service first
+                    const SDK = window.SDK || window.VSS;
+                    if (SDK) {
+                        const accessToken = await SDK.getAccessToken();
+                        const extensionContext = SDK.getExtensionContext();
+                        const dataService = await SDK.getService('ms.vss-features.extension-data-service');
+                        const dataManager = await dataService.getExtensionDataManager(extensionContext.id, accessToken);
+                        
+                        await dataManager.setValue(this.STORAGE_KEY, null, { scopeType: 'User' });
+                    }
+                } catch (error) {
+                    console.warn('Failed to clear credentials from Extension Data Service:', error);
+                }
+                
+                // Also clear localStorage
+                try {
+                    localStorage.removeItem(this.STORAGE_KEY);
+                } catch (error) {
+                    console.warn('Failed to clear credentials from localStorage:', error);
+                }
+                
+                return {
+                    success: true,
+                    data: undefined
+                };
+            }
+            
+            async hasStoredCredentials() {
+                const result = await this.getCredentials();
+                return result.success;
+            }
+        }
+        
+        // Simple Work Item Service
+        class WorkItemService {
+            constructor() {
+                this.formService = null;
+            }
+            
+            async getFormService() {
+                if (!this.formService) {
+                    const SDK = window.SDK || window.VSS;
+                    this.formService = await SDK.getService("ms.vss-work-web.work-item-form");
+                }
+                return this.formService;
+            }
+            
+            async getZepTicketIds() {
+                try {
+                    const service = await this.getFormService();
+                    const value = await service.getFieldValue('Custom.ZEPNummer');
+                    
+                    if (!value) {
+                        return {
+                            success: false,
+                            error: 'No ZEP ticket IDs found in Custom.ZEPNummer field'
+                        };
+                    }
+                    
+                    // Parse comma-separated ticket IDs (e.g., "8136, 8403")
+                    const ticketIds = String(value)
+                        .split(',')
+                        .map(id => id.trim())
+                        .filter(id => id.length > 0);
+                    
+                    if (ticketIds.length === 0) {
+                        return {
+                            success: false,
+                            error: 'Custom.ZEPNummer field is empty or contains no valid ticket IDs'
+                        };
+                    }
+                    
+                    return {
+                        success: true,
+                        data: ticketIds
+                    };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    return {
+                        success: false,
+                        error: `Failed to read ZEP tickets: ${errorMessage}`
+                    };
+                }
+            }
+            
+            async updateDurationField(totalHours) {
+                try {
+                    const service = await this.getFormService();
+                    
+                    // Set the field value - using Custom.IST as per your requirement
+                    await service.setFieldValue('Custom.IST', totalHours);
+                    
+                    console.log(`Updated Custom.IST field to ${totalHours} hours`);
+                    
+                    return {
+                        success: true,
+                        data: undefined
+                    };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    return {
+                        success: false,
+                        error: `Cannot update Custom.IST field: ${errorMessage}. Ensure the field exists and you have permission.`
+                    };
+                }
+            }
+        }
+        
+        // Simple Integration Service
+        class ZepIntegrationService {
+            constructor() {
+                this.zepApi = new ZepApiService();
+                this.workItemService = new WorkItemService();
+                this.credentialService = new CredentialService();
+                this.onStatusUpdate = null;
+            }
+            
+            setStatusCallback(callback) {
+                this.onStatusUpdate = callback;
+            }
+            
+            updateStatus(step, message, progress, totalSteps) {
+                const status = { step, message, progress, totalSteps };
+                if (this.onStatusUpdate) {
+                    this.onStatusUpdate(status);
+                }
+            }
+            
+            async executeZepIntegration() {
+                try {
+                    this.updateStatus('reading', 'Starting ZEP integration...', 0, 4);
+                    
+                    // Step 1: Get ZEP ticket IDs from work item
+                    this.updateStatus('reading', 'Reading ZEP ticket IDs from work item...', 1, 4);
+                    const ticketResult = await this.workItemService.getZepTicketIds();
+                    
+                    if (!ticketResult.success) {
+                        this.updateStatus('error', `Failed to read ZEP tickets: ${ticketResult.error}`);
+                        return ticketResult;
+                    }
+                    
+                    const ticketIds = ticketResult.data;
+                    console.log('Found ZEP ticket IDs:', ticketIds);
+                    
+                    // Step 2: Ensure ZEP API credentials are available
+                    this.updateStatus('reading', 'Checking ZEP API credentials...', 1.5, 4);
+                    const credentialsResult = await this.credentialService.getCredentials();
+                    
+                    if (!credentialsResult.success) {
+                        this.updateStatus('error', 'Failed to load ZEP API credentials');
+                        return {
+                            success: false,
+                            error: 'ZEP API credentials not available. Please configure them first.'
+                        };
+                    }
+                    
+                    const { apiKey, baseUrl } = credentialsResult.data;
+                    
+                    if (!apiKey || !baseUrl) {
+                        this.updateStatus('error', 'ZEP API credentials are incomplete');
+                        return {
+                            success: false,
+                            error: 'ZEP API credentials are incomplete. Please configure API key and base URL.'
+                        };
+                    }
+                    
+                    // Set credentials in ZEP API service
+                    this.zepApi.setCredentials(apiKey, baseUrl);
+                    
+                    // Step 3: Fetch time entries from ZEP API
+                    this.updateStatus('fetching', `Fetching time entries for ${ticketIds.length} ZEP tickets...`, 2, 4);
+                    
+                    let allTimeEntries = [];
+                    
+                    for (let i = 0; i < ticketIds.length; i++) {
+                        const ticketId = ticketIds[i];
+                        this.updateStatus(
+                            'fetching', 
+                            `Fetching time entries for ticket ${ticketId} (${i + 1}/${ticketIds.length})...`,
+                            2 + (i / ticketIds.length) * 0.8,
+                            4
+                        );
+                        
+                        try {
+                            const entries = await this.zepApi.getTimeEntriesForTicket(ticketId);
+                            allTimeEntries.push(...entries);
+                            console.log(`Found ${entries.length} time entries for ticket ${ticketId}`);
+                        } catch (error) {
+                            console.error(`Failed to fetch entries for ticket ${ticketId}:`, error);
+                            // Continue with other tickets even if one fails
+                            console.warn(`Skipping ticket ${ticketId} due to error:`, error);
+                        }
+                    }
+                    
+                    if (allTimeEntries.length === 0) {
+                        this.updateStatus('error', 'No time entries found for any of the ZEP tickets');
+                        return {
+                            success: false,
+                            error: `No time entries found for ZEP tickets: ${ticketIds.join(', ')}`
+                        };
+                    }
+                    
+                    // Step 4: Calculate total duration and update work item
+                    this.updateStatus('updating', 'Calculating total duration and updating work item...', 3, 4);
+                    
+                    const totalHours = this.calculateTotalHours(allTimeEntries);
+                    console.log(`Total hours from ZEP: ${totalHours}`);
+                    
+                    // Update the Custom.IST field with total duration
+                    const updateResult = await this.workItemService.updateDurationField(totalHours);
+                    
+                    if (!updateResult.success) {
+                        this.updateStatus('error', `Failed to update duration field: ${updateResult.error}`);
+                        return updateResult;
+                    }
+                    
+                    // Step 5: Create summary
+                    const summary = {
+                        totalEntries: allTimeEntries.length,
+                        totalHours: totalHours,
+                        ticketIds: ticketIds,
+                        dateRange: this.getDateRange(allTimeEntries)
+                    };
+                    
+                    this.updateStatus('complete', `Successfully updated work item with ${totalHours} hours from ${allTimeEntries.length} time entries`, 4, 4);
+                    
+                    return {
+                        success: true,
+                        data: summary
+                    };
+                    
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    this.updateStatus('error', `Unexpected error: ${errorMessage}`);
+                    
+                    return {
+                        success: false,
+                        error: `Integration failed: ${errorMessage}`
+                    };
+                }
+            }
+            
+            async previewTimeEntries() {
+                try {
+                    // Get ZEP ticket IDs
+                    const ticketResult = await this.workItemService.getZepTicketIds();
+                    if (!ticketResult.success) {
+                        return ticketResult;
+                    }
+                    
+                    // Get credentials
+                    const credentialsResult = await this.credentialService.getCredentials();
+                    if (!credentialsResult.success || !credentialsResult.data.apiKey || !credentialsResult.data.baseUrl) {
+                        return {
+                            success: false,
+                            error: 'ZEP API credentials not configured'
+                        };
+                    }
+                    
+                    const { apiKey, baseUrl } = credentialsResult.data;
+                    this.zepApi.setCredentials(apiKey, baseUrl);
+                    
+                    // Fetch time entries
+                    const timeEntries = await this.zepApi.getTimeEntriesForTickets(ticketResult.data);
+                    
+                    return {
+                        success: true,
+                        data: timeEntries
+                    };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    return {
+                        success: false,
+                        error: `Preview failed: ${errorMessage}`
+                    };
+                }
+            }
+            
+            async testZepConnection() {
+                try {
+                    const credentialsResult = await this.credentialService.getCredentials();
+                    
+                    if (!credentialsResult.success || !credentialsResult.data.apiKey || !credentialsResult.data.baseUrl) {
+                        return {
+                            success: false,
+                            error: 'ZEP API credentials not configured'
+                        };
+                    }
+                    
+                    const { apiKey, baseUrl } = credentialsResult.data;
+                    this.zepApi.setCredentials(apiKey, baseUrl);
+                    
+                    const testResult = await this.zepApi.testConnection();
+                    
+                    if (testResult.success) {
+                        return {
+                            success: true,
+                            data: true
+                        };
+                    } else {
+                        return {
+                            success: false,
+                            error: testResult.error || 'Connection test failed'
+                        };
+                    }
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    return {
+                        success: false,
+                        error: `Connection test failed: ${errorMessage}`
+                    };
+                }
+            }
+            
+            async hasStoredCredentials() {
+                return await this.credentialService.hasStoredCredentials();
+            }
+            
+            calculateTotalHours(timeEntries) {
+                const total = timeEntries.reduce((sum, entry) => sum + entry.duration, 0);
+                return Math.round(total * 100) / 100; // Round to 2 decimal places
+            }
+            
+            getDateRange(timeEntries) {
+                if (timeEntries.length === 0) {
+                    const today = new Date().toISOString().split('T')[0];
+                    return { from: today, to: today };
+                }
+                
+                const dates = timeEntries.map(entry => entry.date).sort();
+                return {
+                    from: dates[0],
+                    to: dates[dates.length - 1]
+                };
+            }
+        }
+        
+        // Initialize services
+        let zepIntegration;
+        let currentStatus = { step: 'reading', message: 'Initializing...' };
+        
+        console.log('🔍 Starting RequireJS loading...');
+        console.log('RequireJS config:', window.requirejs.s.contexts._.config);
+        
+        // Add timeout to detect hanging
+        const loadingTimeout = setTimeout(() => {
+            console.error('⏰ RequireJS loading timed out after 10 seconds');
+            document.getElementById('loading').innerHTML = '<div class="error">SDK loading timed out. Check console for details.</div>';
+        }, 10000);
+        
+        window.requirejs(['SDK'], function (SDK) {
+            clearTimeout(loadingTimeout);
+            console.log('✅ RequireJS callback executed');
+            console.log('SDK type:', typeof SDK);
+            console.log('SDK object:', SDK);
+            
+            if (typeof SDK !== 'undefined') {
+                console.log("SDK is defined. Trying to initialize...");
+                
+                // Make SDK globally available
+                window.SDK = SDK;
+                
+                SDK.init({ loaded: false });
+                
+                SDK.ready().then(async function () {
+                    try {
+                        console.log('SDK ready, initializing ZEP Time Tracker');
+                        
+                        // Initialize services
+                        zepIntegration = new ZepIntegrationService();
+                        
+                        // Set up status callback
+                        zepIntegration.setStatusCallback((status) => {
+                            currentStatus = status;
+                            updateStatusDisplay();
+                        });
+                        
+                        // Get the work item form service
+                        const workItemFormService = await SDK.getService("ms.vss-work-web.work-item-form");
+                        console.log('Work item form service obtained');
+                        
+                        // Get the current work item
+                        const workItemId = await workItemFormService.getId();
+                        const fields = await workItemFormService.getFieldValues(["Custom.ZEPNummer", "Custom.IST"]);
+                        
+                        console.log('Work Item ID:', workItemId);
+                        console.log('Fields:', fields);
+                        
+                        const zepNumber = fields["Custom.ZEPNummer"];
+                        const currentIST = fields["Custom.IST"];
+                        
+                        // Hide loading and show content
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('content').style.display = 'block';
+                        
+                        if (!zepNumber) {
+                            renderContent(`
+                                <div class="container">
+                                    <div class="info-card">
+                                        <h3>📋 No ZEP Ticket Number</h3>
+                                        <p>This work item doesn't have a ZEP ticket number assigned.</p>
+                                        <p>Add a ZEP ticket number to the <strong>Custom.ZEPNummer</strong> field to track time.</p>
+                                        <p><strong>Format:</strong> Single ticket (e.g., "8213") or multiple tickets (e.g., "8213, 8214, 8215")</p>
+                                    </div>
+                                </div>
+                            `);
+                        } else {
+                            // Check if credentials are configured
+                            const hasCredentials = await zepIntegration.hasStoredCredentials();
+                            
+                            if (!hasCredentials) {
+                                renderContent(`
+                                    <div class="container">
+                                        <div class="error">
+                                            <h3>⚠️ ZEP Not Configured</h3>
+                                            <p>Please configure ZEP API settings in the organization settings.</p>
+                                            <p>Go to Organization Settings → Extensions → ZEP Time Tracker</p>
+                                        </div>
+                                    </div>
+                                `);
+                            } else {
+                                // Render main interface
+                                renderMainInterface(zepNumber, currentIST);
+                            }
+                        }
+                        
+                        SDK.notifyLoadSucceeded();
+                    } catch (error) {
+                        console.error('Error in work item extension:', error);
+                        renderContent(`
+                            <div class="container">
+                                <div class="error">
+                                    <h3>❌ Error Loading Extension</h3>
+                                    <p>${error.message}</p>
+                                    <p>Please check the browser console for more details.</p>
+                                </div>
+                            </div>
+                        `);
+                        SDK.notifyLoadFailed(error);
+                    }
+                });
+            } else {
+                console.log('SDK is not defined');
+                document.getElementById('loading').innerHTML = '<div class="error">Failed to load Azure DevOps SDK</div>';
+            }
+        });
+        
+        function renderContent(html) {
+            document.getElementById('content').innerHTML = html;
+        }
+        
+        function renderMainInterface(zepNumber, currentIST) {
+            const ticketIds = zepNumber.split(',').map(id => id.trim()).filter(id => id);
+            
+            renderContent(`
+                <div class="container">
+                    <div class="header">
+                        <h2>🕐 ZEP Time Tracker</h2>
+                        <span class="status" id="connectionStatus">Ready</span>
+                    </div>
+                    
+                    <div class="content">
+                        <div class="info-card">
+                            <h3>📊 Tracking Information</h3>
+                            <p><strong>ZEP Tickets:</strong> ${zepNumber}</p>
+                            <p><strong>Current IST:</strong> ${currentIST || '0'} hours</p>
+                            <p><strong>Ticket Count:</strong> ${ticketIds.length}</p>
+                        </div>
+                        
+                        <div class="status-section" id="statusSection" style="display: none;">
+                            <div class="status-message" id="statusMessage">Ready</div>
+                            <div class="progress-bar" id="progressBar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="time-entries" id="timeEntriesSection" style="display: none;">
+                            <h3>📅 Time Entries</h3>
+                            <div id="timeEntriesList"></div>
+                            <div class="total-hours" id="totalHours" style="display: none;">
+                                <div class="label">Total Hours from ZEP</div>
+                                <div class="value" id="totalHoursValue">0h</div>
+                            </div>
+                        </div>
+                        
+                        <div class="button-group">
+                            <button class="button primary" id="syncButton" onclick="syncTimeEntries()">
+                                🔄 Sync Time from ZEP
+                            </button>
+                            <button class="button secondary" id="previewButton" onclick="previewTimeEntries()">
+                                👁️ Preview Time Entries
+                            </button>
+                            <button class="button secondary" id="testButton" onclick="testConnection()">
+                                🔧 Test Connection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `);
+        }
+        
+        function updateStatusDisplay() {
+            const statusSection = document.getElementById('statusSection');
+            const statusMessage = document.getElementById('statusMessage');
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            const connectionStatus = document.getElementById('connectionStatus');
+            
+            if (statusSection && statusMessage) {
+                statusSection.style.display = 'block';
+                statusMessage.textContent = currentStatus.message;
+                
+                if (currentStatus.progress && currentStatus.totalSteps) {
+                    const percentage = (currentStatus.progress / currentStatus.totalSteps) * 100;
+                    progressFill.style.width = `${percentage}%`;
+                    progressBar.style.display = 'block';
+                } else {
+                    progressBar.style.display = 'none';
+                }
+                
+                // Update connection status
+                if (connectionStatus) {
+                    connectionStatus.className = 'status ' + 
+                        (currentStatus.step === 'error' ? 'error' : 
+                         currentStatus.step === 'complete' ? 'success' : 'active');
+                    connectionStatus.textContent = currentStatus.step === 'error' ? 'Error' :
+                                                  currentStatus.step === 'complete' ? 'Complete' : 'Working';
+                }
+            }
+        }
+        
+        async function syncTimeEntries() {
+            try {
+                const syncButton = document.getElementById('syncButton');
+                syncButton.disabled = true;
+                syncButton.textContent = '⏳ Syncing...';
+                
+                const result = await zepIntegration.executeZepIntegration();
+                
+                if (result.success) {
+                    const summary = result.data;
+                    displayTimeEntriesSummary(summary);
+                    
+                    // Refresh the work item to show updated IST field
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    alert(`Sync failed: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Sync error:', error);
+                alert(`Sync failed: ${error.message}`);
+            } finally {
+                const syncButton = document.getElementById('syncButton');
+                syncButton.disabled = false;
+                syncButton.textContent = '🔄 Sync Time from ZEP';
+            }
+        }
+        
+        async function previewTimeEntries() {
+            try {
+                const previewButton = document.getElementById('previewButton');
+                previewButton.disabled = true;
+                previewButton.textContent = '⏳ Loading...';
+                
+                const result = await zepIntegration.previewTimeEntries();
+                
+                if (result.success) {
+                    displayTimeEntries(result.data);
+                } else {
+                    alert(`Preview failed: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Preview error:', error);
+                alert(`Preview failed: ${error.message}`);
+            } finally {
+                const previewButton = document.getElementById('previewButton');
+                previewButton.disabled = false;
+                previewButton.textContent = '👁️ Preview Time Entries';
+            }
+        }
+        
+        async function testConnection() {
+            try {
+                const testButton = document.getElementById('testButton');
+                testButton.disabled = true;
+                testButton.textContent = '⏳ Testing...';
+                
+                const result = await zepIntegration.testZepConnection();
+                
+                if (result.success) {
+                    alert('✅ Connection successful! ZEP API is accessible.');
+                } else {
+                    alert(`❌ Connection failed: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Test error:', error);
+                alert(`❌ Test failed: ${error.message}`);
+            } finally {
+                const testButton = document.getElementById('testButton');
+                testButton.disabled = false;
+                testButton.textContent = '🔧 Test Connection';
+            }
+        }
+        
+        function displayTimeEntries(timeEntries) {
+            const timeEntriesSection = document.getElementById('timeEntriesSection');
+            const timeEntriesList = document.getElementById('timeEntriesList');
+            const totalHours = document.getElementById('totalHours');
+            const totalHoursValue = document.getElementById('totalHoursValue');
+            
+            if (timeEntries.length === 0) {
+                timeEntriesList.innerHTML = '<p>No time entries found for the specified ZEP tickets.</p>';
+                totalHours.style.display = 'none';
+            } else {
+                const total = timeEntries.reduce((sum, entry) => sum + entry.duration, 0);
+                
+                timeEntriesList.innerHTML = timeEntries.map(entry => `
+                    <div class="time-entry">
+                        <div class="entry-details">
+                            <div class="entry-date">${entry.date}</div>
+                            <div class="entry-description">${entry.description}</div>
+                            <div class="entry-meta">
+                                Ticket: ${entry.ticketId} | Employee: ${entry.employeeId} | ${entry.startTime} - ${entry.endTime}
+                            </div>
+                        </div>
+                        <div class="entry-duration">${entry.duration}h</div>
+                    </div>
+                `).join('');
+                
+                totalHoursValue.textContent = `${total.toFixed(2)}h`;
+                totalHours.style.display = 'block';
+            }
+            
+            timeEntriesSection.style.display = 'block';
+        }
+        
+        function displayTimeEntriesSummary(summary) {
+            const timeEntriesSection = document.getElementById('timeEntriesSection');
+            const timeEntriesList = document.getElementById('timeEntriesList');
+            const totalHours = document.getElementById('totalHours');
+            const totalHoursValue = document.getElementById('totalHoursValue');
+            
+            timeEntriesList.innerHTML = `
+                <div class="summary-card">
+                    <h4>✅ Sync Complete</h4>
+                    <p><strong>Total Entries:</strong> ${summary.totalEntries}</p>
+                    <p><strong>Total Hours:</strong> ${summary.totalHours}</p>
+                    <p><strong>Date Range:</strong> ${summary.dateRange.from} to ${summary.dateRange.to}</p>
+                    <p><strong>Tickets:</strong> ${summary.ticketIds.join(', ')}</p>
+                    <p class="success">✅ Work item IST field updated successfully!</p>
+                </div>
+            `;
+            
+            totalHoursValue.textContent = `${summary.totalHours}h`;
+            totalHours.style.display = 'block';
+            timeEntriesSection.style.display = 'block';
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            gap: 15px;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #0078d4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            max-width: 800px;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e7e7e7;
+        }
+        
+        .header h2 {
+            color: #0078d4;
+            margin: 0;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status.active {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .content {
+            display: grid;
+            gap: 20px;
+        }
+        
+        .info-card {
+            background-color: #f0f8ff;
+            border: 1px solid #b8daff;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        
+        .info-card h3 {
+            color: #004085;
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+        
+        .info-card p {
+            color: #004085;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        
+        .error h3 {
+            color: #721c24;
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+        
+        .error p {
+            color: #721c24;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .status-section {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        
+        .status-message {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background-color: #0078d4;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .time-entries {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        
+        .time-entries h3 {
+            color: #495057;
+            margin: 0 0 15px 0;
+            font-size: 16px;
+        }
+        
+        .time-entry {
+            background: white;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .time-entry:last-child {
+            margin-bottom: 0;
+        }
+        
+        .entry-details {
+            flex: 1;
+        }
+        
+        .entry-date {
+            font-weight: 600;
+            color: #495057;
+            font-size: 14px;
+        }
+        
+        .entry-description {
+            color: #6c757d;
+            font-size: 13px;
+            margin: 4px 0;
+        }
+        
+        .entry-meta {
+            color: #6c757d;
+            font-size: 12px;
+        }
+        
+        .entry-duration {
+            font-weight: 600;
+            color: #0078d4;
+            font-size: 16px;
+        }
+        
+        .total-hours {
+            background-color: #e7f3ff;
+            border: 1px solid #b8daff;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .total-hours .label {
+            font-weight: 600;
+            color: #004085;
+        }
+        
+        .total-hours .value {
+            font-weight: 700;
+            color: #0078d4;
+            font-size: 20px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        .button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .button.primary {
+            background-color: #0078d4;
+            color: white;
+        }
+        
+        .button.primary:hover:not(:disabled) {
+            background-color: #106ebe;
+        }
+        
+        .button.secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .button.secondary:hover:not(:disabled) {
+            background-color: #5a6268;
+        }
+        
+        .summary-card {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        
+        .summary-card h4 {
+            color: #155724;
+            margin: 0 0 10px 0;
+        }
+        
+        .summary-card p {
+            color: #155724;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .summary-card .success {
+            font-weight: 600;
+            margin-top: 10px;
+        }
+    </style>
+</body>
+</html> 

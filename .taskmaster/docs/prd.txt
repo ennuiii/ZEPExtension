@@ -1,0 +1,164 @@
+# Browser-Only Azure DevOps Extension for ZEP Integration - PRD
+
+## Project Overview
+
+This project implements a completely browser-based Azure DevOps extension that directly integrates with ZEP time tracking API without requiring any backend infrastructure. The extension automates the process of reading ZEP ticket IDs from Azure DevOps work items, fetching time entries from ZEP API, and updating duration fields in work items.
+
+## Technical Architecture
+
+### Core Technology Stack
+- TypeScript/React for frontend components
+- Azure DevOps Extension SDK
+- Azure DevOps UI Framework components
+- Direct browser-to-ZEP API calls (CORS dependent)
+- Browser local storage for credential management
+
+### Key Components Required
+1. Extension manifest configuration (vss-extension.json)
+2. Main React component for time tracking interface
+3. ZEP API service for direct API communications
+4. Azure DevOps Work Item service integration
+5. Credential management service with browser storage
+6. TypeScript type definitions
+7. CSS styling and responsive design
+8. HTML entry points and build configuration
+
+## Functional Requirements
+
+### Primary Features
+1. **ZEP Ticket Reading**: Read comma-separated ZEP ticket IDs from Custom.ZepTickets field in Azure DevOps work items
+2. **Time Entry Fetching**: Directly call ZEP API to fetch time entries for specified tickets (last 90 days)
+3. **Duration Calculation**: Calculate total duration from all time entries across multiple tickets
+4. **Work Item Updates**: Update Custom.Duration field in Azure DevOps work item with calculated total
+5. **Credential Management**: Secure storage and management of ZEP API credentials per user
+6. **Sequential Processing**: Execute all three steps (read → fetch → update) in automated sequence
+
+### User Interface Requirements
+1. **Settings Dialog**: Configuration interface for ZEP API credentials (API key, base URL)
+2. **Status Display**: Real-time feedback showing current processing step and progress
+3. **Time Entries Table**: Detailed view of fetched time entries with employee, date, duration, description
+4. **Action Buttons**: Individual step execution and "Sync All Steps" automation
+5. **Error Handling**: Comprehensive error messages with CORS-specific guidance
+6. **Responsive Design**: Mobile-friendly interface within Azure DevOps
+
+### Security Requirements
+1. **Per-User Credentials**: Each user manages their own ZEP API credentials
+2. **Browser Storage**: Secure credential storage using Azure DevOps extension data service with localStorage fallback
+3. **HTTPS Enforcement**: All API communications over HTTPS
+4. **Minimal Permissions**: API keys should have minimal required ZEP permissions
+5. **Optional Persistence**: User choice to remember credentials vs. re-enter each session
+
+## Technical Requirements
+
+### Azure DevOps Integration
+1. **Custom Fields**: Support for Custom.ZepTickets (string) and Custom.Duration (decimal) fields
+2. **Work Item Form Group**: Integration as a form group in work item UI
+3. **Extension Permissions**: vso.work, vso.work_write, vso.extension_data scopes
+4. **Settings Hub**: Project admin settings page for extension configuration
+
+### ZEP API Integration
+1. **Authentication**: Bearer token authentication with ZEP API
+2. **Endpoints**: Integration with /api/v2/attendances and /api/v2/me endpoints
+3. **CORS Support**: Dependency on ZEP API supporting CORS for dev.azure.com domains
+4. **Error Handling**: Graceful handling of API errors, rate limits, authentication failures
+5. **Date Range**: Configurable date range for time entry fetching (default: last 90 days)
+
+### Development Requirements
+1. **Build System**: TypeScript compilation and bundling for Azure DevOps extension
+2. **Package Management**: npm/yarn for dependency management
+3. **Extension Packaging**: Azure DevOps extension packaging with tfx-cli
+4. **Testing Strategy**: Unit tests for services, integration tests for API calls
+5. **Development Environment**: Local development setup with Azure DevOps extension SDK
+
+## Implementation Phases
+
+### Phase 1: Project Setup & Configuration
+- Initialize TypeScript project structure
+- Configure build system and development environment
+- Set up Azure DevOps extension manifest
+- Install required dependencies and SDK
+
+### Phase 2: Core Services Implementation
+- Implement ZEP API service with direct browser calls
+- Create Azure DevOps Work Item service integration
+- Build credential management service with secure storage
+- Define TypeScript interfaces and type definitions
+
+### Phase 3: User Interface Development
+- Create main React component for time tracking interface
+- Build credential configuration dialog
+- Implement time entries display table
+- Add responsive CSS styling and Azure DevOps UI theme integration
+
+### Phase 4: Integration & Error Handling
+- Implement sequential processing workflow
+- Add comprehensive error handling and user feedback
+- Create CORS error detection and guidance
+- Build status indicators and progress tracking
+
+### Phase 5: Testing & Deployment
+- Unit testing for all services and components
+- Integration testing with Azure DevOps work items
+- CORS testing with ZEP API
+- Extension packaging and deployment procedures
+
+## Success Criteria
+
+### Functional Success
+1. Successfully reads ZEP ticket IDs from Azure DevOps custom fields
+2. Fetches time entries from ZEP API for multiple tickets simultaneously
+3. Calculates accurate total duration from all time entries
+4. Updates Azure DevOps work item duration field reliably
+5. Provides clear user feedback for all operations and error states
+
+### User Experience Success
+1. Intuitive interface requiring minimal user training
+2. Fast response times for all operations (< 10 seconds for typical use)
+3. Clear error messages with actionable guidance
+4. Seamless integration within Azure DevOps work item interface
+5. Mobile-responsive design for various screen sizes
+
+### Technical Success
+1. Zero backend infrastructure dependencies
+2. Secure credential management with user control
+3. Robust error handling for all failure scenarios
+4. CORS compatibility guidance for ZEP API configuration
+5. Easy deployment and maintenance procedures
+
+## Risk Mitigation
+
+### CORS Dependency Risk
+- **Risk**: ZEP API may not support CORS for Azure DevOps domains
+- **Mitigation**: Provide clear documentation for CORS configuration, fallback proxy options
+
+### Security Risk
+- **Risk**: API credentials stored in browser less secure than server-side
+- **Mitigation**: User education, credential encryption, minimal permission requirements
+
+### API Changes Risk
+- **Risk**: ZEP API changes could break integration
+- **Mitigation**: Version-specific API integration, comprehensive error handling
+
+## Constraints & Dependencies
+
+### External Dependencies
+1. ZEP API CORS support for https://dev.azure.com domains
+2. Azure DevOps custom fields configured in work item types
+3. User access to ZEP API credentials with appropriate permissions
+4. Modern browser support for Azure DevOps extensions
+
+### Technical Constraints
+1. No backend server infrastructure allowed
+2. Must work within Azure DevOps extension security model
+3. Limited to browser-based storage options
+4. Dependent on Azure DevOps Extension SDK capabilities
+
+## Future Enhancements
+
+### Potential Features
+1. Bulk processing for multiple work items
+2. Scheduled automatic synchronization
+3. Advanced filtering and date range options
+4. Integration with Azure DevOps queries and dashboards
+5. Reporting and analytics dashboard
+6. Support for additional time tracking systems beyond ZEP 

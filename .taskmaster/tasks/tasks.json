@@ -1,0 +1,182 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2024-12-30T10:00:00.000Z",
+    "lastModified": "2024-12-30T10:00:00.000Z",
+    "project": "Browser-Only Azure DevOps Extension for ZEP Integration",
+    "description": "Implementation plan for browser-based Azure DevOps extension that integrates with ZEP time tracking API"
+  },
+  "tags": {
+    "master": {
+      "description": "Main development tasks for ZEP-Azure DevOps integration",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "Project Setup and Build Configuration",
+          "description": "Initialize TypeScript project structure, configure build system, and set up development environment for Azure DevOps extension development",
+          "status": "done",
+          "priority": "high",
+          "dependencies": [],
+          "details": "Set up the foundational project structure including TypeScript configuration, webpack build system, package.json with all required dependencies, and development scripts. Configure Azure DevOps extension development environment with proper file structure and build pipeline.",
+          "testStrategy": "Verify successful TypeScript compilation, webpack bundling, and ability to load extension in Azure DevOps development environment.",
+          "subtasks": []
+        },
+        {
+          "id": 2,
+          "title": "Extension Manifest Configuration",
+          "description": "Create and configure vss-extension.json with all required permissions, contributions, and extension metadata",
+          "status": "done",
+          "priority": "high",
+          "dependencies": [1],
+          "details": "Define extension manifest with proper Azure DevOps integration points including work item form group contribution, settings hub, required scopes (vso.work, vso.work_write, vso.extension_data), and extension metadata. Configure file references and addressing.",
+          "testStrategy": "Validate manifest syntax and verify extension loads properly in Azure DevOps with correct permissions and contributions.",
+          "subtasks": []
+        },
+        {
+          "id": 3,
+          "title": "TypeScript Type Definitions",
+          "description": "Define comprehensive TypeScript interfaces for ZEP API responses, Azure DevOps work items, and internal data structures",
+          "status": "done",
+          "priority": "medium",
+          "dependencies": [1],
+          "details": "Create type definitions for ZepTimeEntry, ZepApiConfig, ZepApiError, and other data structures. Include proper typing for Azure DevOps extension SDK interfaces and API responses from ZEP.",
+          "testStrategy": "Ensure all TypeScript compilation passes without type errors and interfaces match actual API responses.",
+          "subtasks": []
+        },
+        {
+          "id": 4,
+          "title": "ZEP API Service Implementation",
+          "description": "Implement direct browser-to-ZEP API service with authentication, time entry fetching, and error handling",
+          "status": "done",
+          "priority": "high",
+          "dependencies": [3],
+          "details": "Create ZepApiService class with methods for authentication, fetching time entries by ticket ID, connection testing, and comprehensive error handling including CORS detection. Implement proper bearer token authentication and API response transformation.",
+          "testStrategy": "Test API calls with valid ZEP credentials, verify proper error handling for invalid credentials, CORS issues, and API failures.",
+          "subtasks": []
+        },
+        {
+          "id": 5,
+          "title": "Azure DevOps Work Item Service",
+          "description": "Implement service for reading from and writing to Azure DevOps work item fields using the extension SDK",
+          "status": "done",
+          "priority": "high",
+          "dependencies": [3],
+          "details": "Create WorkItemService class using Azure DevOps Extension SDK to read Custom.ZEPNummer field, update CUSTOM.IST field, and save work items. Include proper error handling for missing fields and permission issues.",
+          "testStrategy": "Test field reading and writing operations on actual Azure DevOps work items with custom fields configured.",
+          "subtasks": []
+        },
+        {
+          "id": 6,
+          "title": "Credential Management Service",
+          "description": "Implement secure credential storage using Azure DevOps extension data service with localStorage fallback",
+          "status": "done",
+          "priority": "high",
+          "dependencies": [3],
+          "details": "Create CredentialService class for secure storage and retrieval of ZEP API credentials using Azure DevOps ExtensionDataService with user scope. Include localStorage fallback and optional credential encryption.",
+          "testStrategy": "Verify credentials are properly stored, retrieved, and cleared across browser sessions and extension reloads.",
+          "subtasks": []
+        },
+        {
+          "id": 7,
+          "title": "Main React Component Structure",
+          "description": "Create the primary ZepTimeTracker React component with state management and UI layout",
+          "status": "in-progress",
+          "priority": "high",
+          "dependencies": [4, 5, 6],
+          "details": "Implement the main ZepTimeTracker React component with comprehensive state management for loading states, error handling, ZEP tickets, time entries, and credentials. Include proper component lifecycle management and Azure DevOps SDK initialization.",
+          "testStrategy": "Verify component renders correctly within Azure DevOps work item form and manages state properly through all operations.",
+          "subtasks": []
+        },
+        {
+          "id": 8,
+          "title": "Credential Configuration Dialog",
+          "description": "Implement dialog component for ZEP API credential configuration with validation and security features",
+          "status": "in-progress",
+          "priority": "medium",
+          "dependencies": [6, 7],
+          "details": "Create credential dialog using Azure DevOps UI framework with fields for API key and base URL, validation, remember credentials toggle, and proper security warnings. Include connection testing functionality.",
+          "testStrategy": "Test dialog functionality, credential validation, connection testing, and proper credential persistence options.",
+          "subtasks": []
+        },
+        {
+          "id": 9,
+          "title": "Time Entries Display Table",
+          "description": "Implement table component to display fetched ZEP time entries with sorting and formatting",
+          "status": "pending",
+          "priority": "medium",
+          "dependencies": [7],
+          "details": "Create time entries table using Azure DevOps UI Table component with columns for date, ticket, employee, duration, and description. Include proper formatting for dates and durations, and responsive design.",
+          "testStrategy": "Verify table displays time entries correctly with proper formatting and responsive behavior on different screen sizes.",
+          "subtasks": []
+        },
+        {
+          "id": 10,
+          "title": "Sequential Processing Workflow",
+          "description": "Implement the three-step workflow: read ZEP tickets → fetch time entries → update duration",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [7, 8],
+          "details": "Create orchestrated workflow that executes the three main steps in sequence: reading ZEP ticket IDs from Custom.ZEPNummer field, fetching time entries from ZEP API for each ticket, calculating total duration, and updating CUSTOM.IST field.",
+          "testStrategy": "Test complete end-to-end workflow with multiple ZEP tickets and verify proper error handling at each step.",
+          "subtasks": []
+        },
+        {
+          "id": 11,
+          "title": "Status Indicators and Progress Tracking",
+          "description": "Implement real-time status display and progress indicators for all operations",
+          "status": "pending",
+          "priority": "medium",
+          "dependencies": [10],
+          "details": "Add status messages, loading spinners, and progress indicators to provide clear feedback during each step of the workflow. Include process status display showing current operation and progress through multiple tickets.",
+          "testStrategy": "Verify status indicators update correctly during operations and provide clear feedback to users.",
+          "subtasks": []
+        },
+        {
+          "id": 12,
+          "title": "Comprehensive Error Handling",
+          "description": "Implement robust error handling with specific guidance for CORS and API issues",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [10, 11],
+          "details": "Create comprehensive error handling system with specific error messages for CORS issues, authentication failures, missing fields, API errors, and network problems. Include actionable guidance for resolving each type of error.",
+          "testStrategy": "Test error handling scenarios including CORS blocks, invalid credentials, missing fields, and network failures.",
+          "subtasks": []
+        },
+        {
+          "id": 13,
+          "title": "CSS Styling and Responsive Design",
+          "description": "Implement comprehensive CSS styling with Azure DevOps theme integration and responsive design",
+          "status": "pending",
+          "priority": "medium",
+          "dependencies": [9, 11],
+          "details": "Create CSS styling that integrates with Azure DevOps UI theme, includes responsive design for mobile devices, and provides proper visual hierarchy for all components. Use Azure DevOps color palette and design system.",
+          "testStrategy": "Test responsive design on various screen sizes and verify proper integration with Azure DevOps visual theme.",
+          "subtasks": []
+        },
+        {
+          "id": 14,
+          "title": "HTML Entry Points and Module Loading",
+          "description": "Create HTML entry points and configure module loading for the extension",
+          "status": "done",
+          "priority": "medium",
+          "dependencies": [2, 7],
+          "details": "Create HTML entry points for work item form group and settings hub, configure proper module loading with Azure DevOps SDK, and set up React component mounting with proper initialization.",
+          "testStrategy": "Verify extension loads correctly in Azure DevOps work item forms and settings hub with proper React component initialization.",
+          "subtasks": []
+        },
+        {
+          "id": 15,
+          "title": "Extension Packaging and Deployment",
+          "description": "Configure extension packaging, create deployment documentation, and test installation procedures",
+          "status": "pending",
+          "priority": "medium",
+          "dependencies": [13, 14],
+          "details": "Set up extension packaging using tfx-cli, create comprehensive deployment documentation including Azure DevOps custom field configuration, and test complete installation and configuration procedures.",
+          "testStrategy": "Successfully package extension, install in test Azure DevOps organization, and verify all functionality works end-to-end.",
+          "subtasks": []
+        }
+      ]
+    }
+  },
+  "currentTag": "master"
+} 

@@ -1,0 +1,212 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import fetch from 'node-fetch';
+
+// Load environment variables
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Configure CORS to allow requests from Azure DevOps extension
+app.use(cors({
+  origin: [
+    'https://dev.azure.com',
+    'https://*.visualstudio.com',
+    'https://*.dev.azure.com',
+    'https://*.vsrm.visualstudio.com',
+    'https://localhost:*',
+    'https://127.0.0.1:*',
+    'http://localhost:*',
+    'http://127.0.0.1:*'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With', 'X-ZEP-Base-URL', 'Origin'],
+  exposedHeaders: ['Content-Length', 'X-Request-ID']
+}));
+
+// Parse JSON bodies
+app.use(express.json());
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`🌐 ${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log('📋 Query params:', req.query);
+  console.log('🔑 Headers:', {
+    authorization: req.headers.authorization ? 'Bearer ***' : 'none',
+    'content-type': req.headers['content-type'],
+    origin: req.headers.origin
+  });
+  next();
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    service: 'ZEP API Proxy Server'
+  });
+});
+
+// Main proxy endpoint for ZEP API
+app.all('/api/zep/*', async (req, res) => {
+  try {
+    // Extract the ZEP API endpoint from the request path
+    const zepEndpoint = req.path.replace('/api/zep', '');
+    
+    // Get the ZEP base URL from request headers (sent by the extension)
+    const zepBaseUrl = req.headers['x-zep-base-url'] || process.env.ZEP_BASE_URL;
+    
+    if (!zepBaseUrl) {
+      return res.status(400).json({
+        error: 'ZEP base URL not provided. Set X-ZEP-Base-URL header or ZEP_BASE_URL environment variable.'
+      });
+    }
+
+    // Construct the full ZEP API URL
+    const zepApiUrl = `${zepBaseUrl}/api/v1${zepEndpoint}`;
+    
+    // Build query string if present
+    const queryString = Object.keys(req.query).length > 0 
+      ? '?' + new URLSearchParams(req.query).toString()
+      : '';
+    
+    const fullUrl = `${zepApiUrl}${queryString}`;
+
+    console.log(`🔗 Proxying to ZEP API: ${fullUrl}`);
+    console.log(`📡 Method: ${req.method}`);
+
+    // Prepare headers for ZEP API request
+    const headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'ZEP-Proxy-Server/1.0'
+    };
+
+    // Pass through Authorization header
+    if (req.headers.authorization) {
+      headers['Authorization'] = req.headers.authorization;
+    }
+
+    // Make the request to ZEP API
+    const fetchOptions = {
+      method: req.method,
+      headers: headers,
+      timeout: 30000 // 30 second timeout
+    };
+
+    // Add body for POST/PUT requests
+    if (req.method === 'POST' || req.method === 'PUT') {
+      fetchOptions.body = JSON.stringify(req.body);
+    }
+
+    const response = await fetch(fullUrl, fetchOptions);
+    
+    console.log(`📊 ZEP API Response: ${response.status} ${response.statusText}`);
+
+    // Get response body
+    const responseBody = await response.text();
+    let jsonResponse;
+    
+    try {
+      jsonResponse = JSON.parse(responseBody);
+    } catch (e) {
+      // If response is not JSON, return as text
+      jsonResponse = responseBody;
+    }
+
+    // Set response headers
+    res.status(response.status);
+    
+    // Copy relevant headers from ZEP API response
+    const headersToProxy = ['content-type', 'cache-control', 'expires'];
+    headersToProxy.forEach(header => {
+      if (response.headers.get(header)) {
+        res.set(header, response.headers.get(header));
+      }
+    });
+
+    // Send response back to extension
+    res.json(jsonResponse);
+
+  } catch (error) {
+    console.error('❌ Proxy Error:', error);
+    
+    // Handle different types of errors
+    if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+      return res.status(408).json({
+        error: 'Request timeout - ZEP API did not respond within 30 seconds',
+        details: error.message
+      });
+    }
+    
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      return res.status(503).json({
+        error: 'Cannot connect to ZEP API - check base URL and network connection',
+        details: error.message
+      });
+    }
+    
+    // Generic error response
+    res.status(500).json({
+      error: 'Proxy server error',
+      details: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Handle 404 for other routes
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Endpoint not found',
+    message: 'This proxy server only handles /api/zep/* endpoints',
+    availableEndpoints: ['/health', '/api/zep/*']
+  });
+});
+
+// Global error handler
+app.use((error, req, res, next) => {
+  console.error('💥 Unhandled Error:', error);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: error.message,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Start the server
+app.listen(PORT, '0.0.0.0', () => {
+  const env = process.env.NODE_ENV || 'development';
+  const baseUrl = env === 'production' ? process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}` : `http://localhost:${PORT}`;
+  
+  console.log(`🚀 ZEP Proxy Server running on ${baseUrl}`);
+  console.log(`🌐 Health check: ${baseUrl}/health`);
+  console.log(`📡 Proxy endpoint: ${baseUrl}/api/zep/*`);
+  console.log(`📋 Environment: ${env}`);
+  console.log(`🔧 Port: ${PORT}`);
+  
+  if (process.env.ZEP_BASE_URL) {
+    console.log(`🔧 Default ZEP Base URL: ${process.env.ZEP_BASE_URL}`);
+  } else {
+    console.log(`⚠️  No default ZEP Base URL set. Extension must send X-ZEP-Base-URL header.`);
+  }
+  
+  if (env === 'production') {
+    console.log(`🌍 Production deployment ready for Azure DevOps extensions`);
+  }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 Received SIGTERM, shutting down gracefully...');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 Received SIGINT, shutting down gracefully...');
+  process.exit(0);
+}); 
