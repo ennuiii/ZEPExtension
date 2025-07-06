@@ -35,104 +35,31 @@
         // Simple ZEP API Service
         class ZepApiService {
             constructor() {
-                this.apiKey = '';
-                this.baseUrl = '';
+                console.log('🚀 ZEP API Service initialized in proxy-only mode');
+                console.log('🔄 All requests will go through proxy server');
+                console.log('🔑 Authentication handled server-side');
             }
             
             setCredentials(apiKey, baseUrl) {
-                this.apiKey = apiKey;
-                this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
+                // No-op in proxy-only mode
+                console.log('🔧 Proxy-only mode: Credentials not needed on client side');
+                console.log('🚀 All authentication handled by proxy server');
             }
             
             async getTimeEntriesForTicket(ticketId) {
-                if (!this.apiKey || !this.baseUrl) {
-                    throw new Error('ZEP API credentials not configured');
-                }
+                console.log('🎯 Fetching time entries for ticket:', ticketId);
+                console.log('🚀 Using proxy-only mode - server handles authentication');
                 
-                // Try JSONP first, fallback to fetch
-                try {
-                    console.log('🔍 Attempting JSONP request...');
-                    return await this.getTimeEntriesWithJsonp(ticketId);
-                } catch (jsonpError) {
-                    console.log('❌ JSONP failed, falling back to fetch:', jsonpError.message);
-                    return await this.getTimeEntriesWithFetch(ticketId);
-                }
+                return await this.getTimeEntriesWithProxy(ticketId);
             }
             
-            async getTimeEntriesWithJsonp(ticketId) {
-                return new Promise((resolve, reject) => {
-                    // Create unique callback name
-                    const callbackName = 'zepCallback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                    
-                    // Construct the API endpoint
-                    const url = `${this.baseUrl}/attendances`;
-                    const params = new URLSearchParams({
-                        ticket_id: ticketId,
-                        callback: callbackName,
-                        // Some APIs support auth via query param for JSONP
-                        access_token: this.apiKey
-                    });
-                    
-                    const fullUrl = `${url}?${params}`;
-                    
-                    console.log('🔍 ZEP JSONP Request Debug:');
-                    console.log('  Base URL:', this.baseUrl);
-                    console.log('  Ticket ID:', ticketId);
-                    console.log('  Callback:', callbackName);
-                    console.log('  Full URL:', fullUrl);
-                    
-                    // Set up callback function
-                    window[callbackName] = (data) => {
-                        console.log('✅ JSONP callback received data:', data);
-                        
-                        // Clean up
-                        delete window[callbackName];
-                        document.head.removeChild(script);
-                        
-                        try {
-                            const transformedData = this.transformZepResponse(data, ticketId);
-                            resolve(transformedData);
-                        } catch (error) {
-                            reject(error);
-                        }
-                    };
-                    
-                    // Create script element
-                    const script = document.createElement('script');
-                    script.src = fullUrl;
-                    script.onerror = () => {
-                        console.error('❌ JSONP script failed to load');
-                        delete window[callbackName];
-                        document.head.removeChild(script);
-                        reject(new Error('JSONP request failed - script could not be loaded'));
-                    };
-                    
-                    // Set timeout for JSONP request
-                    const timeout = setTimeout(() => {
-                        console.error('⏰ JSONP request timed out');
-                        delete window[callbackName];
-                        if (script.parentNode) {
-                            document.head.removeChild(script);
-                        }
-                        reject(new Error('JSONP request timed out'));
-                    }, 15000); // 15 second timeout
-                    
-                    // Override callback to clear timeout
-                    const originalCallback = window[callbackName];
-                    window[callbackName] = (data) => {
-                        clearTimeout(timeout);
-                        originalCallback(data);
-                    };
-                    
-                    // Add script to head to make the request
-                    document.head.appendChild(script);
-                });
-            }
+
             
-            async getTimeEntriesWithFetch(ticketId) {
+            async getTimeEntriesWithProxy(ticketId) {
                 try {
-                    // Construct the API endpoint - base URL already includes /api/v1
-                    const url = `${this.baseUrl}/attendances`;
+                    // Construct the proxy API endpoint
+                    const proxyUrl = 'https://zepextension.onrender.com/api/zep';
+                    const url = `${proxyUrl}/attendances`;
                     
                     // Build query parameters - using ticket_id as per actual API
                     const params = new URLSearchParams({
@@ -142,27 +69,22 @@
                     const fullUrl = `${url}?${params}`;
                     
                     // Debug logging
-                    console.log('🔍 ZEP API Fetch Request Debug:');
-                    console.log('  Base URL:', this.baseUrl);
+                    console.log('🔍 ZEP API Proxy Request Debug:');
+                    console.log('  Proxy URL:', proxyUrl);
                     console.log('  Endpoint:', url);
                     console.log('  Ticket ID:', ticketId);
                     console.log('  Query Params:', params.toString());
                     console.log('  Full URL:', fullUrl);
-                    console.log('  API Key (first 10 chars):', this.apiKey.substring(0, 10) + '...');
+                    console.log('  🔑 Authentication handled by proxy server');
                     
                     const headers = {
-                        'Authorization': `Bearer ${this.apiKey}`,
                         'Accept': 'application/json',
                         'Content-Type': 'application/json'
                     };
                     
-                    console.log('  Headers:', {
-                        'Authorization': `Bearer ${this.apiKey.substring(0, 10)}...`,
-                        'Accept': headers['Accept'],
-                        'Content-Type': headers['Content-Type']
-                    });
+                    console.log('  Headers:', headers);
                     
-                    // Make the API request
+                    // Make the API request through proxy
                     const response = await fetch(fullUrl, {
                         method: 'GET',
                         headers: headers,
@@ -180,14 +102,14 @@
                         console.log('  Error Response Body:', errorText);
                         
                         if (response.status === 401) {
-                            throw new Error('Invalid API key. Please check your ZEP credentials.');
+                            throw new Error('Proxy authentication failed. Check proxy server configuration.');
                         } else if (response.status === 403) {
-                            throw new Error('Access forbidden. Check your API permissions.');
+                            throw new Error('Access forbidden. Check proxy server permissions.');
                         } else if (response.status === 404) {
-                            throw new Error('API endpoint not found. Check the base URL.');
+                            throw new Error('API endpoint not found. Check proxy server configuration.');
                         }
                         
-                        throw new Error(`ZEP API error (${response.status}): ${errorText}`);
+                        throw new Error(`Proxy API error (${response.status}): ${errorText}`);
                     }
                     
                     const data = await response.json();
@@ -209,7 +131,7 @@
                     return transformedData;
                     
                 } catch (error) {
-                    console.error('🚨 ZEP API Error Debug:');
+                    console.error('🚨 ZEP Proxy API Error Debug:');
                     console.error('  Error Type:', error.constructor.name);
                     console.error('  Error Message:', error.message);
                     console.error('  Error Stack:', error.stack);
@@ -217,12 +139,13 @@
                     // Check if it's a CORS error
                     if (error instanceof TypeError && error.message === 'Failed to fetch') {
                         const corsError = new Error(
-                            'CORS Error: Cannot connect to ZEP API directly. \n\n' +
-                            'QUICK FIXES:\n' +
-                            '1. Install a CORS browser extension (CORS Unblock for Chrome/Edge)\n' +
-                            '2. Ask your ZEP admin to whitelist Azure DevOps domains\n' +
-                            '3. Use browser with --disable-web-security flag (temporary)\n\n' +
-                            'See CORS_WORKAROUND.md for detailed instructions.'
+                            'CORS Error: Cannot connect to proxy server. \n\n' +
+                            'PROXY SERVER ISSUES:\n' +
+                            '1. Check if proxy server is running at: https://zepextension.onrender.com\n' +
+                            '2. Verify proxy server allows requests from Azure DevOps domains\n' +
+                            '3. Check network connectivity to proxy server\n' +
+                            '4. Try testing proxy health: https://zepextension.onrender.com/health\n\n' +
+                            'If proxy server is down, contact your system administrator.'
                         );
                         console.error('  CORS Error Details:', corsError.message);
                         throw corsError;

@@ -41,11 +41,6 @@ module.exports = (env, argv) => {
         template: './src/workitem-group/workitem-group.html',
         filename: 'workitem-group.html',
         chunks: []
-      }),
-      new HtmlWebpackPlugin({
-        template: './src/settings/settings.html',
-        filename: 'settings.html',
-        chunks: []
       })
     ],
     devtool: isProduction ? 'source-map' : 'eval-source-map',

@@ -2,9 +2,9 @@
   "manifestVersion": 1,
   "id": "zep-time-tracker-browser",
   "publisher": "GOpus",
-      "version": "1.0.43",
+      "version": "1.0.45",
   "name": "ZEP Time Tracker (Browser Edition)",
-  "description": "Direct browser-based ZEP time tracking integration for Azure DevOps",
+  "description": "Proxy-based ZEP time tracking integration for Azure DevOps - no configuration required",
   "public": false,
   "targets": [
     {
@@ -71,18 +71,6 @@
             }
           }
         ]
-      }
-    },
-    {
-      "id": "zep-time-tracker-settings-hub",
-      "type": "ms.vss-web.hub",
-      "targets": [
-        "ms.vss-web.collection-admin-hub-group"
-      ],
-      "properties": {
-        "name": "ZEP Time Tracker",
-        "uri": "src/settings/settings.html",
-        "description": "Configure organization-wide ZEP API settings"
       }
     }
   ]
