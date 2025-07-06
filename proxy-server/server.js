@@ -32,13 +32,16 @@ app.use(express.json());
 
 // Request logging middleware
 app.use((req, res, next) => {
-  console.log(`🌐 ${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log(`\n🌐 ${new Date().toISOString()} - ${req.method} ${req.path}`);
   console.log('📋 Query params:', req.query);
   console.log('🔑 Headers:', {
     authorization: req.headers.authorization ? 'Bearer ***' : 'none',
     'content-type': req.headers['content-type'],
-    origin: req.headers.origin
+    origin: req.headers.origin,
+    'user-agent': req.headers['user-agent'],
+    'x-zep-base-url': req.headers['x-zep-base-url'] || 'not provided'
   });
+  console.log('🌍 Request from:', req.headers.origin || req.headers.referer || 'unknown');
   next();
 });
 
@@ -53,6 +56,12 @@ app.get('/health', (req, res) => {
 
 // Main proxy endpoint for ZEP API
 app.all('/api/zep/*', async (req, res) => {
+  console.log('🎯 ZEP API Proxy Request Received!');
+  console.log('📍 Request URL:', req.originalUrl);
+  console.log('🔧 HTTP Method:', req.method);
+  console.log('🌐 Origin:', req.headers.origin || 'unknown');
+  console.log('🔑 Has Authorization:', !!req.headers.authorization);
+  
   try {
     // Extract the ZEP API endpoint from the request path
     const zepEndpoint = req.path.replace('/api/zep', '');
@@ -78,6 +87,9 @@ app.all('/api/zep/*', async (req, res) => {
 
     console.log(`🔗 Proxying to ZEP API: ${fullUrl}`);
     console.log(`📡 Method: ${req.method}`);
+    console.log(`🎯 ZEP Endpoint: ${zepEndpoint}`);
+    console.log(`🏢 ZEP Base URL: ${zepBaseUrl}`);
+    console.log(`📝 Query String: ${queryString || 'none'}`);
 
     // Prepare headers for ZEP API request
     const headers = {
@@ -106,6 +118,8 @@ app.all('/api/zep/*', async (req, res) => {
     const response = await fetch(fullUrl, fetchOptions);
     
     console.log(`📊 ZEP API Response: ${response.status} ${response.statusText}`);
+    console.log(`📏 Response size: ${response.headers.get('content-length') || 'unknown'} bytes`);
+    console.log(`📦 Response type: ${response.headers.get('content-type') || 'unknown'}`);
 
     // Get response body
     const responseBody = await response.text();
@@ -134,6 +148,12 @@ app.all('/api/zep/*', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Proxy Error:', error);
+    console.error('🔍 Error details:', {
+      name: error.name,
+      code: error.code,
+      message: error.message,
+      cause: error.cause
+    });
     
     // Handle different types of errors
     if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {

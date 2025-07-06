@@ -672,8 +672,9 @@
                         };
                     }
                     
-                    // Set credentials in ZEP API service
-                    this.zepApi.setCredentials(apiKey, baseUrl);
+                    // Set credentials in ZEP API service (with proxy settings)
+                    const { useProxy, proxyUrl } = credentialsResult.data;
+                    this.zepApi.setCredentials(apiKey, baseUrl, useProxy, proxyUrl);
                     
                     // Step 3: Fetch time entries from ZEP API
                     this.updateStatus('fetching', `Fetching time entries for ${ticketIds.length} ZEP tickets...`, 2, 4);
@@ -765,8 +766,8 @@
                         };
                     }
                     
-                    const { apiKey, baseUrl } = credentialsResult.data;
-                    this.zepApi.setCredentials(apiKey, baseUrl);
+                    const { apiKey, baseUrl, useProxy, proxyUrl } = credentialsResult.data;
+                    this.zepApi.setCredentials(apiKey, baseUrl, useProxy, proxyUrl);
                     
                     // Fetch time entries
                     const timeEntries = await this.zepApi.getTimeEntriesForTickets(ticketResult.data);
@@ -795,8 +796,8 @@
                         };
                     }
                     
-                    const { apiKey, baseUrl } = credentialsResult.data;
-                    this.zepApi.setCredentials(apiKey, baseUrl);
+                    const { apiKey, baseUrl, useProxy, proxyUrl } = credentialsResult.data;
+                    this.zepApi.setCredentials(apiKey, baseUrl, useProxy, proxyUrl);
                     
                     const testResult = await this.zepApi.testConnection();
                     

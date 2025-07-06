@@ -29,7 +29,7 @@ export class CredentialService {
   /**
    * Save credentials to localStorage (primary method)
    */
-  async saveCredentials(apiKey: string, baseUrl: string, useProxy: boolean = false, proxyUrl: string = ''): Promise<ApiCallResult<void>> {
+  async saveCredentials(apiKey: string, baseUrl: string, useProxy: boolean = true, proxyUrl: string = 'https://zepextension.onrender.com/api/zep'): Promise<ApiCallResult<void>> {
     try {
       // Use localStorage as primary storage since we don't have extension data permissions
       this.saveCredentialsToLocalStorage(apiKey, baseUrl, useProxy, proxyUrl);
@@ -104,31 +104,41 @@ export class CredentialService {
   /**
    * Fallback: Get credentials from localStorage
    */
-  private getCredentialsFromLocalStorage(): { apiKey?: string; baseUrl?: string } {
+  private getCredentialsFromLocalStorage(): { apiKey?: string; baseUrl?: string; useProxy?: boolean; proxyUrl?: string } {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (stored) {
         const credentials = JSON.parse(stored);
         return {
           apiKey: credentials.apiKey ? this.decrypt(credentials.apiKey) : undefined,
-          baseUrl: credentials.baseUrl || undefined
+          baseUrl: credentials.baseUrl || undefined,
+          useProxy: credentials.useProxy !== undefined ? credentials.useProxy : true, // Default to true for CORS workaround
+          proxyUrl: credentials.proxyUrl || 'https://zepextension.onrender.com/api/zep'
         };
       }
-      return {};
+      return {
+        useProxy: true, // Default to true for CORS workaround
+        proxyUrl: 'https://zepextension.onrender.com/api/zep'
+      };
     } catch (error) {
       console.error('Failed to read from localStorage:', error);
-      return {};
+      return {
+        useProxy: true, // Default to true for CORS workaround
+        proxyUrl: 'https://zepextension.onrender.com/api/zep'
+      };
     }
   }
 
   /**
    * Fallback: Save credentials to localStorage
    */
-  private saveCredentialsToLocalStorage(apiKey: string, baseUrl: string, useProxy: boolean = false, proxyUrl: string = ''): void {
+  private saveCredentialsToLocalStorage(apiKey: string, baseUrl: string, useProxy: boolean = true, proxyUrl: string = 'https://zepextension.onrender.com/api/zep'): void {
     try {
       const credentials = {
         apiKey: this.encrypt(apiKey),
         baseUrl: baseUrl,
+        useProxy: useProxy,
+        proxyUrl: proxyUrl,
         updatedAt: new Date().toISOString()
       };
       

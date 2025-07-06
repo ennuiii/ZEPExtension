@@ -12,8 +12,8 @@ import {
 export class ZepApiService {
   private apiKey: string = '';
   private baseUrl: string = '';
-  private useProxy: boolean = false;
-  private proxyUrl: string = 'https://zep-proxy-server.onrender.com/api/zep';
+  private useProxy: boolean = true; // Default to proxy mode to avoid CORS issues
+  private proxyUrl: string = 'https://zepextension.onrender.com/api/zep';
   
   setCredentials(apiKey: string, baseUrl: string, useProxy: boolean = false, proxyUrl?: string): void {
     this.apiKey = apiKey;
@@ -21,6 +21,22 @@ export class ZepApiService {
     this.useProxy = useProxy;
     if (proxyUrl) {
       this.proxyUrl = proxyUrl.replace(/\/$/, ''); // Remove trailing slash
+    }
+    
+    // Debug configuration
+    console.log('🔧 ZEP API Service Configuration Updated:');
+    console.log('  ├─ API Key:', this.apiKey ? `${this.apiKey.substring(0, 8)}...` : 'NOT SET');
+    console.log('  ├─ Base URL:', this.baseUrl || 'NOT SET');
+    console.log('  ├─ Use Proxy:', this.useProxy);
+    console.log('  └─ Proxy URL:', this.proxyUrl);
+    
+    if (this.useProxy) {
+      console.log('🚨 PROXY MODE ENABLED - All requests will go through proxy server');
+      console.log('📡 Proxy Server URL:', this.proxyUrl);
+      console.log('🔀 Proxy will forward to:', this.baseUrl);
+    } else {
+      console.log('🚨 DIRECT MODE - Requests will go directly to ZEP API (may cause CORS issues)');
+      console.log('🎯 Direct API URL:', this.baseUrl);
     }
   }
 
@@ -54,7 +70,16 @@ export class ZepApiService {
 
       console.log(`🔗 ZEP API Request: ${url}?${params}`);
       console.log(`📡 Using proxy: ${this.useProxy}`);
+      console.log(`🌐 Proxy URL: ${this.proxyUrl}`);
+      console.log(`🏢 Base URL: ${this.baseUrl}`);
       console.log(`🔑 API Key: ${this.apiKey.substring(0, 8)}...`);
+      
+      if (this.useProxy) {
+        console.log(`🔄 PROXY MODE: Forwarding request through proxy server`);
+        console.log(`📤 Proxy will forward to: ${this.baseUrl}/api/v1${'/attendances'}`);
+      } else {
+        console.log(`🔄 DIRECT MODE: Making direct API call to ZEP server`);
+      }
 
       // Prepare headers for the request
       const headers: HeadersInit = {
@@ -66,7 +91,13 @@ export class ZepApiService {
       // When using proxy, send the base URL as a header
       if (this.useProxy) {
         headers['X-ZEP-Base-URL'] = this.baseUrl;
+        console.log(`📨 Adding X-ZEP-Base-URL header: ${this.baseUrl}`);
       }
+      
+      console.log(`📋 Request headers:`, Object.keys(headers).reduce((acc, key) => {
+        acc[key] = key === 'Authorization' ? 'Bearer ***' : headers[key];
+        return acc;
+      }, {} as any));
 
       // Make the API request
       const response = await fetch(`${url}?${params}`, {
@@ -102,9 +133,25 @@ export class ZepApiService {
       
       // Check if it's a CORS error
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        const corsMessage = `CORS Error: Cannot connect to ZEP API directly. 
+        const corsMessage = this.useProxy 
+          ? `CORS Error: Cannot connect to proxy server at ${this.proxyUrl}
 
-QUICK FIXES:
+PROXY SERVER ISSUES:
+1. Check if proxy server is running at: ${this.proxyUrl}
+2. Verify proxy server allows requests from Azure DevOps domains
+3. Check network connectivity to proxy server
+4. Try testing proxy health: ${this.proxyUrl.replace('/api/zep', '/health')}
+
+Current configuration:
+- Proxy Mode: ${this.useProxy ? 'ENABLED' : 'DISABLED'}
+- Proxy URL: ${this.proxyUrl}
+- ZEP Base URL: ${this.baseUrl}`
+          : `CORS Error: Cannot connect to ZEP API directly. 
+
+RECOMMENDED FIX: Enable proxy mode in extension settings!
+Proxy URL: https://zepextension.onrender.com/api/zep
+
+OTHER FIXES:
 1. Install a CORS browser extension (CORS Unblock for Chrome/Edge)
 2. Ask your ZEP admin to whitelist Azure DevOps domains
 3. Use browser with --disable-web-security flag (temporary)
@@ -209,7 +256,13 @@ See CORS_WORKAROUND.md for detailed instructions.`;
       // When using proxy, send the base URL as a header
       if (this.useProxy) {
         headers['X-ZEP-Base-URL'] = this.baseUrl;
+        console.log(`🧪 TEST: Adding X-ZEP-Base-URL header: ${this.baseUrl}`);
       }
+      
+      console.log(`🧪 TEST: Request headers:`, Object.keys(headers).reduce((acc, key) => {
+        acc[key] = key === 'Authorization' ? 'Bearer ***' : headers[key];
+        return acc;
+      }, {} as any));
 
       const response = await fetch(`${url}`, {
         method: 'GET',
