@@ -135,7 +135,7 @@ This approach is no longer recommended but can be used if organization-wide sett
 ```javascript
 const ZEP_CONFIG = {
     baseUrl: 'https://your-company.zep.de',
-    apiKey: 'your-actual-api-token-here'
+    apiKey: 'your_actual_zep_api_key_here'
 };
 ```
 
