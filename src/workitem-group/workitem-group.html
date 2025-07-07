@@ -801,12 +801,15 @@
                         const ticketData = await response.json();
                         console.log(`📋 Ticket ${ticketId} details received:`, ticketData);
 
+                        // Handle response structure with 'data' wrapper
+                        const ticket = ticketData.data || ticketData;
+
                         return {
-                            id: ticketData.id.toString(),
-                            title: ticketData.title || `Ticket ${ticketId}`,
-                            plannedHours: ticketData.planned_hours || 0,
-                            description: ticketData.description,
-                            status: ticketData.status
+                            id: ticket.id ? ticket.id.toString() : ticketId,
+                            title: ticket.subject || ticket.title || `Ticket ${ticketId}`,
+                            plannedHours: ticket.planned_hours || 0,
+                            description: ticket.description,
+                            status: ticket.status
                         };
 
                     } catch (error) {
