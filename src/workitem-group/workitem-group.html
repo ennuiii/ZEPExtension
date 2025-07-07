@@ -427,7 +427,9 @@
         <div class="controls">
             <div class="filter-group">
                 <label for="ticketFilter">Ticket ID</label>
-                <input type="text" id="ticketFilter" placeholder="Filter by ticket ID">
+                <select id="ticketFilter">
+                    <option value="">All tickets</option>
+                </select>
             </div>
             
             <div class="filter-group">
@@ -443,7 +445,6 @@
             <div class="buttons">
                 <button class="btn" id="clearFiltersBtn">Clear Filters</button>
                 <button class="btn" id="refreshBtn">Refresh</button>
-                <button class="btn" id="testConnectionBtn">Test Connection</button>
                 <button class="btn primary" id="fetchBtn">Fetch Time Entries</button>
                 <button class="btn" id="syncToISTBtn">Sync Total to IST Field</button>
             </div>
@@ -544,11 +545,11 @@
                     fetchTimeEntries();
                 });
                 document.getElementById('clearFiltersBtn').addEventListener('click', clearFilters);
-                document.getElementById('testConnectionBtn').addEventListener('click', testProxyConnection);
+
                 document.getElementById('syncToISTBtn').addEventListener('click', syncTotalToIST);
                 
                 // Filter change handlers
-                document.getElementById('ticketFilter').addEventListener('input', applyFilters);
+                document.getElementById('ticketFilter').addEventListener('change', applyFilters);
                 document.getElementById('dateFromFilter').addEventListener('change', applyFilters);
                 document.getElementById('dateToFilter').addEventListener('change', applyFilters);
 
@@ -558,42 +559,25 @@
                     console.log('Work Item ID:', id);
                 });
 
-                async function testProxyConnection() {
-                    try {
-                        showStatus('Testing proxy connection...', 'info');
-                        
-                        const proxyUrl = 'https://zepextension.onrender.com/api/test';
-                        console.log(`🧪 Testing connection to: ${proxyUrl}`);
-                        
-                        const response = await fetch(proxyUrl, {
-                            method: 'GET',
-                            headers: {},  // No headers to avoid preflight
-                            mode: 'cors',
-                            credentials: 'omit',
-                            referrerPolicy: 'no-referrer'
-                        });
-                        
-                        console.log(`🧪 Test response status: ${response.status} ${response.statusText}`);
-                        console.log(`🧪 Test response headers:`, Object.fromEntries(response.headers));
-                        
-                        if (!response.ok) {
-                            throw new Error(`Test request failed: ${response.statusText}`);
-                        }
-                        
-                        const data = await response.json();
-                        console.log(`🧪 Test response data:`, data);
-                        
-                        showStatus(`✅ Proxy connection test successful! Server time: ${data.timestamp}`, 'success');
-                        
-                    } catch (error) {
-                        console.error('🧪 Test connection failed:', error);
-                        
-                        if (error instanceof TypeError && error.message === 'Failed to fetch') {
-                            showStatus('❌ Connection test failed: CORS or network issue. Check browser console for details.', 'error');
-                        } else {
-                            showStatus(`❌ Connection test failed: ${error.message}`, 'error');
-                        }
-                    }
+                // Clear date filters on extension load
+                document.getElementById('dateFromFilter').value = '';
+                document.getElementById('dateToFilter').value = '';
+
+
+
+                function populateTicketDropdown(ticketSummaries) {
+                    const dropdown = document.getElementById('ticketFilter');
+                    
+                    // Clear existing options except "All tickets"
+                    dropdown.innerHTML = '<option value="">All tickets</option>';
+                    
+                    // Add option for each ticket
+                    ticketSummaries.forEach(ticket => {
+                        const option = document.createElement('option');
+                        option.value = ticket.id;
+                        option.textContent = `${ticket.id} - ${ticket.title}`;
+                        dropdown.appendChild(option);
+                    });
                 }
 
                 function clearFilters() {
@@ -624,8 +608,8 @@
 
                 function filterTimeEntries(entries, filter) {
                     return entries.filter(entry => {
-                        // Ticket ID filter (partial match)
-                        if (filter.ticketId && !entry.ticketId.toLowerCase().includes(filter.ticketId.toLowerCase())) {
+                        // Ticket ID filter (exact match for dropdown)
+                        if (filter.ticketId && entry.ticketId !== filter.ticketId) {
                             return false;
                         }
                         
@@ -691,6 +675,9 @@
                         allTimeEntries = timeEntries;
                         allTicketSummaries = ticketSummaries;
 
+                        // Populate ticket dropdown
+                        populateTicketDropdown(ticketSummaries);
+                        
                         updateDisplay(timeEntries, ticketSummaries);
                         
                         if (timeEntries.length === 0) {
@@ -715,7 +702,7 @@
                     for (const ticketId of ticketIds) {
                         try {
                             // Apply ticket filter if specified
-                            if (filter.ticketId && !ticketId.toLowerCase().includes(filter.ticketId.toLowerCase())) {
+                            if (filter.ticketId && ticketId !== filter.ticketId) {
                                 continue;
                             }
 
