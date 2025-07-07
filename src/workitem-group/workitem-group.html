@@ -57,78 +57,89 @@
             
             async getTimeEntriesWithProxy(ticketId) {
                 try {
+                    const allEntries = [];
+                    let currentPage = 1;
+                    let hasMorePages = true;
+
                     // Construct the proxy API endpoint
                     const proxyUrl = 'https://zepextension.onrender.com/api/zep';
                     const url = `${proxyUrl}/attendances`;
-                    
-                    // Build query parameters - using ticket_id as per actual API
-                    const params = new URLSearchParams({
-                        ticket_id: ticketId
-                    });
-                    
-                    const fullUrl = `${url}?${params}`;
-                    
-                    // Debug logging
-                    console.log('🔍 ZEP API Proxy Request Debug:');
+
+                    console.log('🔍 ZEP API Proxy Request with Pagination:');
                     console.log('  Proxy URL:', proxyUrl);
                     console.log('  Endpoint:', url);
                     console.log('  Ticket ID:', ticketId);
-                    console.log('  Query Params:', params.toString());
-                    console.log('  Full URL:', fullUrl);
                     console.log('  🔑 Authentication handled by proxy server');
-                    
-                    const headers = {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    };
-                    
-                    console.log('  Headers:', headers);
-                    
-                    // Make the API request through proxy
-                    const response = await fetch(fullUrl, {
-                        method: 'GET',
-                        headers: headers,
-                        mode: 'cors',
-                        credentials: 'omit'
-                    });
-                    
-                    console.log('📡 ZEP API Response Debug:');
-                    console.log('  Status:', response.status);
-                    console.log('  Status Text:', response.statusText);
-                    console.log('  Headers:', Object.fromEntries(response.headers.entries()));
-                    
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        console.log('  Error Response Body:', errorText);
+
+                    while (hasMorePages) {
+                        // Build query parameters - using ticket_id as per actual API
+                        // Use limit=100 to get maximum results per page (reduces API calls)
+                        const params = new URLSearchParams({
+                            ticket_id: ticketId,
+                            limit: '100',
+                            page: currentPage.toString()
+                        });
                         
-                        if (response.status === 401) {
-                            throw new Error('Proxy authentication failed. Check proxy server configuration.');
-                        } else if (response.status === 403) {
-                            throw new Error('Access forbidden. Check proxy server permissions.');
-                        } else if (response.status === 404) {
-                            throw new Error('API endpoint not found. Check proxy server configuration.');
+                        const fullUrl = `${url}?${params}`;
+                        
+                        console.log(`📄 Fetching page ${currentPage} with limit 100:`, fullUrl);
+                        
+                        const headers = {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        };
+                        
+                        // Make the API request through proxy
+                        const response = await fetch(fullUrl, {
+                            method: 'GET',
+                            headers: headers,
+                            mode: 'cors',
+                            credentials: 'omit'
+                        });
+                        
+                        console.log(`📡 Page ${currentPage} Response:`, response.status, response.statusText);
+                        
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            console.log('  Error Response Body:', errorText);
+                            
+                            if (response.status === 401) {
+                                throw new Error('Proxy authentication failed. Check proxy server configuration.');
+                            } else if (response.status === 403) {
+                                throw new Error('Access forbidden. Check proxy server permissions.');
+                            } else if (response.status === 404) {
+                                throw new Error('API endpoint not found. Check proxy server configuration.');
+                            }
+                            
+                            throw new Error(`Proxy API error (${response.status}): ${errorText}`);
                         }
                         
-                        throw new Error(`Proxy API error (${response.status}): ${errorText}`);
-                    }
-                    
-                    const data = await response.json();
-                    console.log('  Response Data:', data);
-                    console.log('  Data Type:', typeof data);
-                    console.log('  Data Keys:', Object.keys(data));
-                    
-                    if (data.data && Array.isArray(data.data)) {
-                        console.log('  Entries Count:', data.data.length);
-                        if (data.data.length > 0) {
-                            console.log('  First Entry Sample:', data.data[0]);
+                        const data = await response.json();
+                        console.log(`📋 Page ${currentPage} - Entries received:`, data.data?.length || 0);
+                        
+                        if (data.data && Array.isArray(data.data)) {
+                            if (currentPage === 1 && data.data.length > 0) {
+                                console.log('  First Entry Sample:', data.data[0]);
+                            }
+                        }
+                        
+                        // Transform ZEP API response to our format and add to all entries
+                        const pageEntries = this.transformZepResponse(data, ticketId);
+                        allEntries.push(...pageEntries);
+
+                        // Check pagination metadata to see if there are more pages
+                        if (data.meta) {
+                            console.log(`📊 Pagination info - Current: ${data.meta.current_page}, Last: ${data.meta.last_page}, Total: ${data.meta.total}`);
+                            hasMorePages = data.meta.current_page < data.meta.last_page;
+                            currentPage++;
+                        } else {
+                            // If no meta data, assume this is the last page
+                            hasMorePages = false;
                         }
                     }
-                    
-                    // Transform ZEP API response to our format
-                    const transformedData = this.transformZepResponse(data, ticketId);
-                    console.log('  Transformed Data:', transformedData);
-                    
-                    return transformedData;
+
+                    console.log(`✅ Pagination complete! Total entries fetched: ${allEntries.length}`);
+                    return allEntries;
                     
                 } catch (error) {
                     console.error('🚨 ZEP Proxy API Error Debug:');

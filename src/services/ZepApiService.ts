@@ -38,57 +38,81 @@ export class ZepApiService {
   /**
    * Get time entries for a specific ticket/project
    * Based on ZEP API documentation: https://developer.zep.de/rest-documentation/attendances/list
+   * Now handles pagination to get ALL results
    */
   async getTimeEntriesForTicket(ticketId: string): Promise<ZepTimeEntry[]> {
     try {
-      // Construct the API endpoint
-      const url = this.getApiUrl('/attendances');
-      
-      // Build query parameters - using ticket_id as per actual API
-      const params = new URLSearchParams({
-        ticket_id: ticketId
-      });
+      const allEntries: ZepTimeEntry[] = [];
+      let currentPage = 1;
+      let hasMorePages = true;
 
-      console.log(`🔗 ZEP API Request (via proxy): ${url}?${params}`);
+      console.log(`🔗 ZEP API Request (via proxy) with pagination for ticket: ${ticketId}`);
       console.log(`🔄 PROXY MODE: All requests go through proxy server`);
       console.log(`🔑 Authentication handled server-side`);
 
-      // Prepare headers for the request (no authentication needed - handled by proxy)
-      const headers: HeadersInit = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      };
-      
-      console.log(`📋 Request headers:`, headers);
-
-      // Make the API request
-      const response = await fetch(`${url}?${params}`, {
-        method: 'GET',
-        headers: headers,
-        mode: 'cors', // Always use CORS mode
-        credentials: 'omit' // Don't send cookies
-      });
-
-      console.log(`📊 Response Status: ${response.status} ${response.statusText}`);
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new ZepApiConnectionError('Invalid API key. Please check your ZEP credentials.', 401);
-        } else if (response.status === 403) {
-          throw new ZepApiConnectionError('Access forbidden. Check your API permissions.', 403);
-        } else if (response.status === 404) {
-          throw new ZepApiConnectionError('API endpoint not found. Check the base URL.', 404);
-        }
+      while (hasMorePages) {
+        // Construct the API endpoint
+        const url = this.getApiUrl('/attendances');
         
-        const errorText = await response.text();
-        throw new ZepApiConnectionError(`ZEP API error (${response.status}): ${errorText}`, response.status);
+        // Build query parameters - using ticket_id as per actual API
+        // Use limit=100 to get maximum results per page (reduces API calls)
+        const params = new URLSearchParams({
+          ticket_id: ticketId,
+          limit: '100',
+          page: currentPage.toString()
+        });
+
+        console.log(`📄 Fetching page ${currentPage} with limit 100: ${url}?${params}`);
+
+        // Prepare headers for the request (no authentication needed - handled by proxy)
+        const headers: HeadersInit = {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        };
+
+        // Make the API request
+        const response = await fetch(`${url}?${params}`, {
+          method: 'GET',
+          headers: headers,
+          mode: 'cors', // Always use CORS mode
+          credentials: 'omit' // Don't send cookies
+        });
+
+        console.log(`📊 Page ${currentPage} Response Status: ${response.status} ${response.statusText}`);
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new ZepApiConnectionError('Invalid API key. Please check your ZEP credentials.', 401);
+          } else if (response.status === 403) {
+            throw new ZepApiConnectionError('Access forbidden. Check your API permissions.', 403);
+          } else if (response.status === 404) {
+            throw new ZepApiConnectionError('API endpoint not found. Check the base URL.', 404);
+          }
+          
+          const errorText = await response.text();
+          throw new ZepApiConnectionError(`ZEP API error (${response.status}): ${errorText}`, response.status);
+        }
+
+        const data: ZepAttendanceResponse = await response.json();
+        console.log(`📋 Page ${currentPage} - Entries received: ${data.data?.length || 0}`);
+        
+        // Transform and add entries from this page
+        const pageEntries = this.transformZepResponse(data, ticketId);
+        allEntries.push(...pageEntries);
+
+        // Check pagination metadata to see if there are more pages
+        if (data.meta) {
+          console.log(`📊 Pagination info - Current: ${data.meta.current_page}, Last: ${data.meta.last_page}, Total: ${data.meta.total}`);
+          hasMorePages = data.meta.current_page < data.meta.last_page;
+          currentPage++;
+        } else {
+          // If no meta data, assume this is the last page
+          hasMorePages = false;
+        }
       }
 
-      const data: ZepAttendanceResponse = await response.json();
-      console.log(`📋 ZEP API Response:`, data);
-      
-      // Transform ZEP API response to our format
-      return this.transformZepResponse(data, ticketId);
+      console.log(`✅ Pagination complete! Total entries fetched: ${allEntries.length}`);
+      return allEntries;
       
     } catch (error) {
       console.error('❌ ZEP API Error:', error);
