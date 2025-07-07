@@ -1,6 +1,6 @@
 {
   "name": "zep-time-tracker-browser",
-  "version": "1.0.48",
+  "version": "1.0.49",
   "description": "Browser-only Azure DevOps extension for ZEP time tracking integration",
   "main": "src/workitem-group/workitem-group.html",
   "scripts": {

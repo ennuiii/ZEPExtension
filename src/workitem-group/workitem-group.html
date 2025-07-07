@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>ZEP Time Tracker</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/azure-devops-extension-sdk@2.0.11/lib/SDK.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -473,30 +473,14 @@
     </div>
 
     <script>
-        // Configure require.js to load the Azure DevOps Extension SDK
-        window.requirejs.config({
-            enforceDefine: true,
-            paths: {
-                'SDK': './lib/SDK.min'
-            }
+        // Initialize Azure DevOps SDK
+        VSS.init({
+            explicitNotifyLoaded: true,
+            usePlatformStyles: true
         });
 
-        // Initialize Azure DevOps SDK using require.js
-        window.requirejs(['SDK'], function (SDK) {
-            if (typeof SDK === 'undefined') {
-                console.error('Azure DevOps Extension SDK is not defined');
-                return;
-            }
-
-            console.log("Azure DevOps Extension SDK loaded successfully");
-            
-            SDK.init({
-                explicitNotifyLoaded: true,
-                usePlatformStyles: true
-            });
-
-            SDK.ready().then(function() {
-                const workItemFormService = SDK.getService(SDK.ServiceIds.WorkItemFormService);
+        VSS.ready(function() {
+            const workItemFormService = VSS.getService(VSS.ServiceIds.WorkItemFormService);
                 let currentWorkItemId = null;
                 let currentFilter = {};
                 let allTimeEntries = [];
@@ -998,11 +982,10 @@
                 const thirtyDaysAgo = new Date(today);
                 thirtyDaysAgo.setDate(today.getDate() - 30);
                 
-                document.getElementById('dateFromFilter').value = thirtyDaysAgo.toISOString().split('T')[0];
-                document.getElementById('dateToFilter').value = today.toISOString().split('T')[0];
+            document.getElementById('dateFromFilter').value = thirtyDaysAgo.toISOString().split('T')[0];
+            document.getElementById('dateToFilter').value = today.toISOString().split('T')[0];
 
-                SDK.notifyLoadedAndReady();
-            });
+            VSS.notifyLoadedAndReady();
         });
     </script>
 </body>
