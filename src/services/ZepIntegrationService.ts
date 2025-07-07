@@ -8,7 +8,10 @@ import {
   ApiCallResult,
   ZepApiConnectionError,
   ZepCorsError,
-  WorkItemFieldError
+  WorkItemFieldError,
+  ZepTicketDetails,
+  ZepTicketSummary,
+  ZepTimeEntryFilter
 } from '../types/ZepTypes';
 
 export class ZepIntegrationService {
@@ -153,6 +156,8 @@ export class ZepIntegrationService {
       const summary: TimeEntrySummary = {
         totalEntries: allTimeEntries.length,
         totalHours: totalHours,
+        totalPlannedHours: 0, // Legacy method doesn't fetch planned hours
+        ticketSummaries: [], // Legacy method doesn't provide per-ticket summaries
         ticketIds: ticketIds,
         dateRange: this.getDateRange(allTimeEntries)
       };
@@ -316,5 +321,185 @@ export class ZepIntegrationService {
    */
   async hasStoredCredentials(): Promise<boolean> {
     return await this.credentialService.hasStoredCredentials();
+  }
+
+  /**
+   * Get time entries for work item with filtering and planned hours support
+   */
+  async getTimeEntriesForWorkItem(workItemId: string, ticketIds: string[], filter?: ZepTimeEntryFilter): Promise<ApiCallResult<TimeEntrySummary>> {
+    try {
+      console.log('🔄 Starting ZEP integration for work item:', workItemId);
+      console.log('📋 Tickets to fetch:', ticketIds);
+      console.log('🔍 Filter applied:', filter);
+
+      // Fetch time entries for all tickets with filtering
+      const allTimeEntries = await this.zepApi.getTimeEntriesForTickets(ticketIds, filter);
+      
+      // Fetch ticket details to get planned hours
+      const ticketDetails = await this.zepApi.getTicketsDetails(ticketIds);
+      
+      // Calculate per-ticket summaries
+      const ticketSummaries = this.calculateTicketSummaries(allTimeEntries, ticketDetails);
+      
+      // Calculate overall summary
+      const totalHours = allTimeEntries.reduce((sum, entry) => sum + entry.duration, 0);
+      const totalPlannedHours = ticketSummaries.reduce((sum, ticket) => sum + ticket.plannedHours, 0);
+      
+      const summary: TimeEntrySummary = {
+        totalEntries: allTimeEntries.length,
+        totalHours,
+        totalPlannedHours,
+        ticketSummaries,
+        ticketIds,
+        dateRange: this.getDateRange(allTimeEntries)
+      };
+
+      console.log('✅ ZEP integration completed successfully');
+      console.log(`📊 Summary: ${totalHours}h actual / ${totalPlannedHours}h planned across ${allTimeEntries.length} entries`);
+
+      return {
+        success: true,
+        data: summary
+      };
+
+    } catch (error) {
+      console.error('❌ ZEP Integration Error:', error);
+      
+      let errorMessage: string;
+      let errorDetails: any = {};
+
+      if (error instanceof ZepCorsError) {
+        errorMessage = `CORS Error: ${error.message}`;
+        errorDetails = { type: 'cors' };
+      } else if (error instanceof ZepApiConnectionError) {
+        errorMessage = `ZEP API Error: ${error.message}`;
+        errorDetails = { statusCode: error.statusCode };
+      } else {
+        errorMessage = error instanceof Error ? error.message : String(error);
+        errorDetails = { type: 'unknown' };
+      }
+
+      return {
+        success: false,
+        error: errorMessage,
+        details: errorDetails
+      };
+    }
+  }
+
+  /**
+   * Calculate per-ticket summaries with planned vs actual hours
+   */
+  private calculateTicketSummaries(timeEntries: ZepTimeEntry[], ticketDetails: ZepTicketDetails[]): ZepTicketSummary[] {
+    const ticketMap = new Map<string, ZepTicketSummary>();
+    
+    // Initialize summaries for all tickets (even those without time entries)
+    ticketDetails.forEach(ticket => {
+      ticketMap.set(ticket.id, {
+        ticketId: ticket.id,
+        plannedHours: ticket.plannedHours,
+        actualHours: 0,
+        entryCount: 0,
+        ticketDetails: ticket
+      });
+    });
+    
+    // Aggregate time entries by ticket
+    timeEntries.forEach(entry => {
+      const existing = ticketMap.get(entry.ticketId) || {
+        ticketId: entry.ticketId,
+        plannedHours: 0,
+        actualHours: 0,
+        entryCount: 0
+      };
+      
+      existing.actualHours += entry.duration;
+      existing.entryCount += 1;
+      
+      ticketMap.set(entry.ticketId, existing);
+    });
+    
+    return Array.from(ticketMap.values());
+  }
+
+  /**
+   * Apply filters to time entries
+   */
+  private applyFilters(entries: ZepTimeEntry[], filter: ZepTimeEntryFilter): ZepTimeEntry[] {
+    return entries.filter(entry => {
+      // Date range filter
+      if (filter.dateFrom && entry.date < filter.dateFrom) {
+        return false;
+      }
+      if (filter.dateTo && entry.date > filter.dateTo) {
+        return false;
+      }
+      
+      // Ticket ID filter (partial match)
+      if (filter.ticketId && !entry.ticketId.toLowerCase().includes(filter.ticketId.toLowerCase())) {
+        return false;
+      }
+      
+      // Employee filter
+      if (filter.employeeId && entry.employeeId !== filter.employeeId) {
+        return false;
+      }
+      
+      return true;
+    });
+  }
+
+  /**
+   * Format duration for display
+   */
+  formatDuration(hours: number): string {
+    if (hours === 0) return '0h';
+    if (hours < 1) return `${Math.round(hours * 60)}m`;
+    
+    const wholeHours = Math.floor(hours);
+    const minutes = Math.round((hours - wholeHours) * 60);
+    
+    if (minutes === 0) return `${wholeHours}h`;
+    return `${wholeHours}h ${minutes}m`;
+  }
+
+  /**
+   * Format date for display (remove time component)
+   */
+  formatDate(dateString: string): string {
+    if (!dateString) return '';
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit', 
+        year: 'numeric'
+      });
+    } catch (error) {
+      return dateString;
+    }
+  }
+
+  /**
+   * Test ZEP API connection
+   */
+  async testConnection(): Promise<ApiCallResult<any>> {
+    try {
+      return await this.zepApi.testConnection();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        error: `Connection test failed: ${errorMessage}`
+      };
+    }
+  }
+
+  /**
+   * Get ZEP API configuration
+   */
+  getApiConfig() {
+    return this.zepApi.getConfig();
   }
 } 

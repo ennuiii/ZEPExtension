@@ -13,6 +13,33 @@ export interface ZepTimeEntry {
   billable: boolean;
 }
 
+// New interface for ticket details with planned hours
+export interface ZepTicketDetails {
+  id: string;
+  title: string;
+  plannedHours: number;
+  description?: string;
+  status?: string;
+  project?: string;
+}
+
+// New interface for ticket summary
+export interface ZepTicketSummary {
+  ticketId: string;
+  plannedHours: number;
+  actualHours: number;
+  entryCount: number;
+  ticketDetails?: ZepTicketDetails;
+}
+
+// Filter options for time entries
+export interface ZepTimeEntryFilter {
+  ticketId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  employeeId?: string;
+}
+
 export interface ZepApiConfig {
   apiKey: string;
   baseUrl: string;
@@ -61,6 +88,18 @@ export interface ZepAttendanceItem {
   };
   project_released_at?: string;
   project_released_by?: string;
+  created: string;
+  modified: string;
+}
+
+// ZEP Ticket API Response
+export interface ZepTicketResponse {
+  id: number;
+  title: string;
+  description?: string;
+  status?: string;
+  planned_hours?: number;
+  project_id?: number;
   created: string;
   modified: string;
 }
@@ -129,11 +168,15 @@ export interface ExtensionConfiguration {
 export interface TimeEntrySummary {
   totalEntries: number;
   totalHours: number;
+  totalPlannedHours: number;
+  ticketSummaries: ZepTicketSummary[];
   ticketIds: string[];
   dateRange: {
     from: string;
     to: string;
   };
+  entries?: ZepTimeEntry[];
+  workItemId?: string;
 }
 
 // Component Props Types

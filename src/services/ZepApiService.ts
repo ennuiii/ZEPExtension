@@ -3,6 +3,9 @@ import {
   ZepApiConfig,
   ZepAttendanceResponse,
   ZepAttendanceItem,
+  ZepTicketDetails,
+  ZepTicketResponse,
+  ZepTimeEntryFilter,
   ZepUserInfo,
   ZepApiConnectionError,
   ZepCorsError,
@@ -36,11 +39,98 @@ export class ZepApiService {
   }
 
   /**
+   * Get ticket details including planned hours
+   */
+  async getTicketDetails(ticketId: string): Promise<ZepTicketDetails> {
+    try {
+      const url = this.getApiUrl(`/tickets/${ticketId}`);
+      
+      console.log(`🎫 Fetching ticket details for: ${ticketId}`);
+
+      const headers: HeadersInit = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      };
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: headers,
+        mode: 'cors',
+        credentials: 'omit'
+      });
+
+      console.log(`📊 Ticket ${ticketId} Response Status: ${response.status} ${response.statusText}`);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn(`⚠️ Ticket ${ticketId} not found, using default values`);
+          return {
+            id: ticketId,
+            title: `Ticket ${ticketId}`,
+            plannedHours: 0,
+            description: 'Ticket details not available'
+          };
+        }
+        
+        const errorText = await response.text();
+        throw new ZepApiConnectionError(`Failed to fetch ticket ${ticketId}: ${errorText}`, response.status);
+      }
+
+      const ticketData: ZepTicketResponse = await response.json();
+      console.log(`📋 Ticket ${ticketId} details received:`, ticketData);
+
+      return {
+        id: ticketData.id.toString(),
+        title: ticketData.title || `Ticket ${ticketId}`,
+        plannedHours: ticketData.planned_hours || 0,
+        description: ticketData.description,
+        status: ticketData.status
+      };
+
+    } catch (error) {
+      console.error(`❌ Failed to fetch ticket details for ${ticketId}:`, error);
+      
+      // Return fallback ticket details
+      return {
+        id: ticketId,
+        title: `Ticket ${ticketId}`,
+        plannedHours: 0,
+        description: 'Failed to load ticket details'
+      };
+    }
+  }
+
+  /**
+   * Get ticket details for multiple tickets
+   */
+  async getTicketsDetails(ticketIds: string[]): Promise<ZepTicketDetails[]> {
+    const ticketDetails: ZepTicketDetails[] = [];
+    
+    for (const ticketId of ticketIds) {
+      try {
+        const details = await this.getTicketDetails(ticketId.trim());
+        ticketDetails.push(details);
+      } catch (error) {
+        console.error(`Failed to fetch details for ticket ${ticketId}:`, error);
+        // Add fallback details
+        ticketDetails.push({
+          id: ticketId,
+          title: `Ticket ${ticketId}`,
+          plannedHours: 0,
+          description: 'Failed to load ticket details'
+        });
+      }
+    }
+    
+    return ticketDetails;
+  }
+
+  /**
    * Get time entries for a specific ticket/project
    * Based on ZEP API documentation: https://developer.zep.de/rest-documentation/attendances/list
    * Now handles pagination to get ALL results
    */
-  async getTimeEntriesForTicket(ticketId: string): Promise<ZepTimeEntry[]> {
+  async getTimeEntriesForTicket(ticketId: string, filter?: ZepTimeEntryFilter): Promise<ZepTimeEntry[]> {
     try {
       const allEntries: ZepTimeEntry[] = [];
       let currentPage = 1;
@@ -61,6 +151,19 @@ export class ZepApiService {
           limit: '100',
           page: currentPage.toString()
         });
+
+        // Add filter parameters if provided
+        if (filter) {
+          if (filter.dateFrom) {
+            params.append('date_from', filter.dateFrom);
+          }
+          if (filter.dateTo) {
+            params.append('date_to', filter.dateTo);
+          }
+          if (filter.employeeId) {
+            params.append('employee_id', filter.employeeId);
+          }
+        }
 
         console.log(`📄 Fetching page ${currentPage} with limit 100: ${url}?${params}`);
 
@@ -146,14 +249,19 @@ Current configuration:
   }
 
   /**
-   * Get time entries for multiple tickets
+   * Get time entries for multiple tickets with filtering support
    */
-  async getTimeEntriesForTickets(ticketIds: string[]): Promise<ZepTimeEntry[]> {
+  async getTimeEntriesForTickets(ticketIds: string[], filter?: ZepTimeEntryFilter): Promise<ZepTimeEntry[]> {
     const allEntries: ZepTimeEntry[] = [];
     
     for (const ticketId of ticketIds) {
       try {
-        const entries = await this.getTimeEntriesForTicket(ticketId.trim());
+        // Apply ticket filter if specified
+        if (filter?.ticketId && !ticketId.trim().includes(filter.ticketId)) {
+          continue;
+        }
+        
+        const entries = await this.getTimeEntriesForTicket(ticketId.trim(), filter);
         allEntries.push(...entries);
       } catch (error) {
         console.error(`Failed to fetch entries for ticket ${ticketId}:`, error);
