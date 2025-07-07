@@ -28,11 +28,29 @@ app.use(cors({
     'http://127.0.0.1:3000',
     'http://127.0.0.1:8080'
   ],
-  credentials: true,
+  credentials: false, // Change to false as extension doesn't need credentials
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With', 'X-ZEP-Base-URL', 'Origin'],
-  exposedHeaders: ['Content-Length', 'X-Request-ID']
+  exposedHeaders: ['Content-Length', 'X-Request-ID'],
+  optionsSuccessStatus: 200 // Ensure OPTIONS requests return 200
 }));
+
+// Additional CORS headers middleware for troubleshooting
+app.use((req, res, next) => {
+  // Set CORS headers explicitly
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With, X-ZEP-Base-URL, Origin');
+  res.header('Access-Control-Max-Age', '86400'); // 24 hours
+  
+  // Handle preflight OPTIONS requests
+  if (req.method === 'OPTIONS') {
+    console.log('🔧 Handling CORS preflight request');
+    return res.status(200).end();
+  }
+  
+  next();
+});
 
 // Parse JSON bodies
 app.use(express.json());
@@ -61,6 +79,25 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Simple test endpoint for Azure DevOps extension debugging
+app.get('/api/test', (req, res) => {
+  console.log('🧪 Test endpoint called from:', req.headers.origin || 'unknown');
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With, X-ZEP-Base-URL, Origin');
+  
+  res.json({
+    success: true,
+    message: 'Test endpoint working correctly',
+    timestamp: new Date().toISOString(),
+    requestHeaders: {
+      origin: req.headers.origin,
+      userAgent: req.headers['user-agent'],
+      referer: req.headers.referer
+    }
+  });
+});
+
 // Main proxy endpoint for ZEP API
 app.all('/api/zep/*', async (req, res) => {
   console.log('🎯 ZEP API Proxy Request Received!');
@@ -82,12 +119,14 @@ app.all('/api/zep/*', async (req, res) => {
     console.log('  └─ ZEP API Key:', zepApiKey ? `${zepApiKey.substring(0, 8)}...` : 'NOT SET');
     
     if (!zepBaseUrl) {
+      res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
       return res.status(500).json({
         error: 'Server configuration error: ZEP_BASE_URL environment variable not set.'
       });
     }
     
     if (!zepApiKey) {
+      res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
       return res.status(500).json({
         error: 'Server configuration error: ZEP_API_KEY environment variable not set.'
       });
@@ -141,10 +180,18 @@ app.all('/api/zep/*', async (req, res) => {
     const responseBody = await response.text();
     let jsonResponse;
     
+    console.log(`📄 Raw response body (first 200 chars): ${responseBody.substring(0, 200)}${responseBody.length > 200 ? '...' : ''}`);
+    
     try {
       jsonResponse = JSON.parse(responseBody);
+      console.log(`📋 Parsed JSON response type: ${Array.isArray(jsonResponse) ? 'array' : typeof jsonResponse}`);
+      if (Array.isArray(jsonResponse)) {
+        console.log(`📊 Response array length: ${jsonResponse.length}`);
+      } else if (jsonResponse && typeof jsonResponse === 'object') {
+        console.log(`📊 Response object keys: ${Object.keys(jsonResponse).slice(0, 5).join(', ')}`);
+      }
     } catch (e) {
-      // If response is not JSON, return as text
+      console.log(`⚠️ Response is not valid JSON, sending as text: ${e.message}`);
       jsonResponse = responseBody;
     }
 
@@ -159,7 +206,13 @@ app.all('/api/zep/*', async (req, res) => {
       }
     });
 
+    // Set additional CORS headers for the response
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With, X-ZEP-Base-URL, Origin');
+    
     // Send response back to extension
+    console.log('✅ Sending successful response back to extension');
     res.json(jsonResponse);
 
   } catch (error) {
@@ -171,8 +224,14 @@ app.all('/api/zep/*', async (req, res) => {
       cause: error.cause
     });
     
+    // Set CORS headers for error responses
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With, X-ZEP-Base-URL, Origin');
+    
     // Handle different types of errors
     if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+      console.log('⏰ Request timeout error');
       return res.status(408).json({
         error: 'Request timeout - ZEP API did not respond within 30 seconds',
         details: error.message
@@ -180,6 +239,7 @@ app.all('/api/zep/*', async (req, res) => {
     }
     
     if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      console.log('🔌 Connection error to ZEP API');
       return res.status(503).json({
         error: 'Cannot connect to ZEP API - check base URL and network connection',
         details: error.message
@@ -187,6 +247,7 @@ app.all('/api/zep/*', async (req, res) => {
     }
     
     // Generic error response
+    console.log('💥 Generic proxy error');
     res.status(500).json({
       error: 'Proxy server error',
       details: error.message,
