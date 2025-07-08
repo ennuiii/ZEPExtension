@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZEP Dashboard Widget</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 16px;
+            background: transparent;
+            font-size: 14px;
+            color: #323130;
+        }
+
+        .widget-container {
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 16px;
+            height: 100%;
+            box-sizing: border-box;
+        }
+
+        .widget-header {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #edebe9;
+        }
+
+        .widget-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0;
+            color: #323130;
+        }
+
+        .widget-subtitle {
+            font-size: 12px;
+            color: #605e5c;
+            margin: 4px 0 0 0;
+        }
+
+        .action-section {
+            margin-bottom: 16px;
+        }
+
+        .update-button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 120px;
+        }
+
+        .update-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        .update-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status-section {
+            margin-top: 16px;
+        }
+
+        .status-message {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .status-info {
+            background: #deecf9;
+            color: #004578;
+            border: 1px solid #b3d6fc;
+        }
+
+        .status-success {
+            background: #dff6dd;
+            color: #107c10;
+            border: 1px solid #92c353;
+        }
+
+        .status-warning {
+            background: #fff4ce;
+            color: #8a8886;
+            border: 1px solid #ffaa44;
+        }
+
+        .status-error {
+            background: #fde7e9;
+            color: #a4262c;
+            border: 1px solid #d13438;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #0078d4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .progress-section {
+            margin-top: 12px;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #edebe9;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #0078d4;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            font-size: 12px;
+            color: #605e5c;
+            margin-top: 4px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .stat-card {
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0078d4;
+            margin: 0;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #605e5c;
+            margin: 4px 0 0 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .no-query-message {
+            text-align: center;
+            color: #605e5c;
+            font-style: italic;
+            padding: 20px;
+        }
+
+        .results-section {
+            background: #f8f9fa;
+            border: 1px solid #edebe9;
+            border-radius: 4px;
+            padding: 16px;
+        }
+
+        .workitem-row {
+            display: grid;
+            grid-template-columns: 60px 1fr 100px 150px;
+            gap: 8px;
+            padding: 8px;
+            border-bottom: 1px solid #edebe9;
+            align-items: center;
+        }
+
+        .workitem-row:last-child {
+            border-bottom: none;
+        }
+
+        .workitem-row:hover {
+            background: #f3f2f1;
+        }
+
+        .workitem-id {
+            font-weight: 600;
+            color: #0078d4;
+        }
+
+        .workitem-id-link {
+            font-weight: 600;
+            color: #0078d4;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .workitem-id-link:hover {
+            text-decoration: underline;
+            color: #106ebe;
+        }
+
+        .workitem-title {
+            color: #323130;
+        }
+
+        .workitem-type {
+            font-size: 11px;
+            background: #deecf9;
+            color: #004578;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-align: center;
+        }
+
+        .workitem-zep {
+            font-family: 'Courier New', monospace;
+            color: #605e5c;
+            font-size: 11px;
+        }
+
+        .results-header {
+            display: grid;
+            grid-template-columns: 60px 1fr 100px 150px;
+            gap: 8px;
+            padding: 8px;
+            font-weight: 600;
+            border-bottom: 2px solid #323130;
+            margin-bottom: 8px;
+            color: #323130;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            width: 90%;
+            height: 80%;
+            max-width: 1200px;
+            max-height: 800px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #edebe9;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #323130;
+            margin: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #605e5c;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .modal-close:hover {
+            background: #f3f2f1;
+            color: #323130;
+        }
+
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            margin: 0 -8px;
+            padding: 0 8px;
+        }
+
+        .expand-button {
+            padding: 4px 8px;
+            background: #f8f9fa;
+            border: 1px solid #edebe9;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            color: #605e5c;
+            margin-left: 8px;
+        }
+
+        .expand-button:hover {
+            background: #edebe9;
+            color: #323130;
+        }
+    </style>
+</head>
+<body>
+    <div class="widget-container">
+        <div class="widget-header">
+            <h2 class="widget-title" id="widgetTitle">ZEP Zeiten aktualisieren</h2>
+            <p class="widget-subtitle" id="widgetSubtitle">Klicken Sie auf den Button, um ZEP-Zeiten für alle Work Items zu aktualisieren</p>
+        </div>
+
+        <div class="action-section">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="update-button" id="previewQueryButton" onclick="previewQueryResults()" style="background-color: #605e5c; min-width: auto;">
+                    Query-Daten anzeigen
+                </button>
+                <button class="update-button" id="previewTimesButton" onclick="previewZepTimes()" style="background-color: #8764b8; min-width: auto;">
+                    Zeiten-Update vorschau
+                </button>
+                <button class="update-button" id="updateButton" onclick="updateZepTimes()">
+                    Zeiten aktualisieren
+                </button>
+            </div>
+        </div>
+
+        <div class="progress-section" id="progressSection">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">0 von 0 Work Items verarbeitet</div>
+        </div>
+
+        <div class="status-section" id="statusSection">
+        </div>
+
+        <div class="stats-grid" id="statsGrid" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-value" id="processedCount">0</div>
+                <div class="stat-label">Verarbeitet</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="updatedCount">0</div>
+                <div class="stat-label">Aktualisiert</div>
+            </div>
+        </div>
+
+        <div class="results-section" id="resultsSection" style="display: none; margin-top: 16px;">
+            <div style="font-weight: 600; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #edebe9;">
+                Ergebnisse
+                <button class="expand-button" onclick="openModal()">Vollbild anzeigen</button>
+                <button onclick="hideQueryResults()" style="float: right; background: none; border: none; color: #605e5c; cursor: pointer; font-size: 16px;">×</button>
+            </div>
+            <div id="queryResultsContent" style="max-height: 300px; overflow-y: auto; font-size: 12px;">
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for expanded view -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">ZEP Daten - Vollansicht</h2>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Content will be copied here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="../../lib/SDK/VSS.SDK.min.js"></script>
+    <script type="text/javascript">
+        // Global variables
+        let workItemTrackingClient;
+        let projectId;
+        let widgetConfiguration = {
+            title: 'ZEP Zeiten aktualisieren',
+            buttonText: 'Zeiten aktualisieren',
+            buttonColor: '#0078d4',
+            queryId: null
+        };
+
+        // Initialize VSS SDK
+        VSS.init({
+            explicitNotifyLoaded: true,
+            usePlatformStyles: true
+        });
+
+        VSS.require(["TFS/Dashboards/WidgetHelpers", "TFS/WorkItemTracking/RestClient"], 
+            function (WidgetHelpers, TFS_Wit_WebApi) {
+                WidgetHelpers.IncludeWidgetStyles();
+                
+                // Store the modules globally
+                window.WorkItemTrackingRestClient = TFS_Wit_WebApi;
+                window.WidgetHelpers = WidgetHelpers;
+                
+                VSS.register("ZepDashboardWidget", function () {
+                    return {
+                        load: loadWidget,
+                        reload: reloadWidget
+                    };
+                });
+                VSS.notifyLoadSucceeded();
+            }
+        );
+
+        function loadWidget(widgetSettings) {
+            console.log('🔍 Widget: Loading widget with settings:', widgetSettings);
+            
+            try {
+                // Get project context
+                const context = VSS.getWebContext();
+                console.log('🔍 Widget: VSS context:', context);
+                projectId = context.project.id;
+                console.log('🔍 Widget: Project ID:', projectId);
+                
+                // Get work item tracking client
+                workItemTrackingClient = window.WorkItemTrackingRestClient.getClient();
+                console.log('🔍 Widget: WorkItemTrackingClient obtained:', !!workItemTrackingClient);
+                
+                // Apply widget configuration
+                if (widgetSettings && widgetSettings.customSettings && widgetSettings.customSettings.data) {
+                    try {
+                        const config = JSON.parse(widgetSettings.customSettings.data);
+                        console.log('🔍 Widget: Applying configuration:', config);
+                        applyConfiguration(config);
+                    } catch (error) {
+                        console.error('🔍 Widget: Error parsing widget configuration:', error);
+                        showStatus('Fehler beim Laden der Konfiguration. Bitte Widget neu konfigurieren.', 'error');
+                    }
+                } else {
+                    console.log('🔍 Widget: No configuration found');
+                    showStatus('Widget nicht konfiguriert. Bitte konfigurieren Sie das Widget über die Einstellungen.', 'warning');
+                    // Disable buttons until configured
+                    document.getElementById('previewQueryButton').disabled = true;
+                    document.getElementById('previewTimesButton').disabled = true;
+                    document.getElementById('updateButton').disabled = true;
+                }
+                
+                return window.WidgetHelpers.WidgetStatusHelper.Success();
+            } catch (error) {
+                console.error('🔍 Widget: Error loading widget:', error);
+                console.error('🔍 Widget: Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    contextAvailable: !!VSS.getWebContext(),
+                    projectId: projectId
+                });
+                showStatus('Fehler beim Laden des Widgets: ' + error.message, 'error');
+                return window.WidgetHelpers.WidgetStatusHelper.Failure(error.message);
+            }
+        }
+
+        function reloadWidget(widgetSettings) {
+            return loadWidget(widgetSettings);
+        }
+
+        function preloadWidget(widgetSettings) {
+            return SDK.WidgetStatusHelper.Success();
+        }
+
+        function applyConfiguration(config) {
+            if (config) {
+                widgetConfiguration = { ...widgetConfiguration, ...config };
+                
+                // Update UI elements
+                if (config.title) {
+                    document.getElementById('widgetTitle').textContent = config.title;
+                }
+                
+                if (config.buttonText) {
+                    document.getElementById('updateButton').textContent = config.buttonText;
+                }
+                
+                if (config.buttonColor) {
+                    document.getElementById('updateButton').style.backgroundColor = config.buttonColor;
+                    document.getElementById('updateButton').style.color = getContrastColor(config.buttonColor);
+                }
+                
+                if (config.queryId) {
+                    document.getElementById('widgetSubtitle').textContent = 
+                        `Query ID: ${config.queryId} - Verwenden Sie die Buttons zum Vorschauen und Aktualisieren`;
+                    // Enable buttons
+                    document.getElementById('previewQueryButton').disabled = false;
+                    document.getElementById('previewTimesButton').disabled = false;
+                    document.getElementById('updateButton').disabled = false;
+                } else {
+                    document.getElementById('widgetSubtitle').textContent = 
+                        'Bitte konfigurieren Sie das Widget mit einer Query';
+                    // Disable buttons
+                    document.getElementById('previewQueryButton').disabled = true;
+                    document.getElementById('previewTimesButton').disabled = true;
+                    document.getElementById('updateButton').disabled = true;
+                }
+            }
+        }
+
+        function getContrastColor(hexColor) {
+            // Convert hex to RGB
+            const r = parseInt(hexColor.substr(1, 2), 16);
+            const g = parseInt(hexColor.substr(3, 2), 16);
+            const b = parseInt(hexColor.substr(5, 2), 16);
+            
+            // Calculate luminance
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            
+            return luminance > 0.5 ? '#000000' : '#ffffff';
+        }
+
+        function getWorkItemUrl(workItemId) {
+            // Get the current Azure DevOps context
+            const context = VSS.getWebContext();
+            const baseUrl = context.host.uri;
+            const project = context.project.name;
+            
+            // Construct the work item URL - baseUrl already includes organization
+            return `${baseUrl}${encodeURIComponent(project)}/_workitems/edit/${workItemId}`;
+        }
+
+
+
+        async function previewQueryResults() {
+            const queryId = widgetConfiguration.queryId;
+            
+            console.log('🔍 Widget: previewQueryResults called with queryId:', queryId);
+            
+            if (!queryId) {
+                showStatus('Fehler: Widget nicht konfiguriert. Bitte konfigurieren Sie das Widget.', 'error');
+                return;
+            }
+
+            try {
+                setPreviewLoading(true);
+                showStatus('Lade Query-Ergebnisse...', 'info');
+
+                // Execute the query to get work items
+                const allWorkItems = await executeQueryForPreview(queryId);
+                
+                if (allWorkItems.length === 0) {
+                    showStatus('Keine Work Items in der Query gefunden.', 'warning');
+                    return;
+                }
+
+                // Filter work items with ZEP numbers
+                const workItemsWithZep = allWorkItems.filter(wi => 
+                    wi.fields && 
+                    wi.fields['Custom.ZEPNummer'] && 
+                    wi.fields['Custom.ZEPNummer'].trim()
+                );
+
+                displayQueryResults(allWorkItems, workItemsWithZep);
+                showStatus(`✅ Query-Ergebnisse geladen: ${allWorkItems.length} Work Items gefunden, ${workItemsWithZep.length} mit ZEP-Nummern.`, 'success');
+
+            } catch (error) {
+                console.error('🔍 Widget: Error previewing query results:', error);
+                showStatus(`Fehler beim Laden der Query-Ergebnisse: ${error.message}`, 'error');
+            } finally {
+                setPreviewLoading(false);
+            }
+        }
+
+        async function executeQueryForPreview(queryId) {
+            try {
+                console.log('🔍 Widget: Executing query for preview:', queryId);
+                const queryResult = await workItemTrackingClient.queryById(queryId, projectId);
+                console.log('🔍 Widget: Query result:', queryResult);
+                
+                if (!queryResult.workItems || queryResult.workItems.length === 0) {
+                    return [];
+                }
+                
+                // Get work item IDs
+                const workItemIds = queryResult.workItems.map(wi => wi.id);
+                console.log('🔍 Widget: Work item IDs from query:', workItemIds);
+                
+                // Get detailed work item data
+                const workItems = await workItemTrackingClient.getWorkItems(workItemIds, null, null, 'All');
+                console.log('🔍 Widget: Detailed work items:', workItems);
+                
+                return workItems;
+                
+            } catch (error) {
+                console.error('🔍 Widget: Error executing query for preview:', error);
+                throw new Error(`Query-Ausführung fehlgeschlagen: ${error.message}`);
+            }
+        }
+
+        function displayQueryResults(allWorkItems, workItemsWithZep) {
+            const resultsContent = document.getElementById('queryResultsContent');
+            
+            let html = `
+                <div style="margin-bottom: 16px;">
+                    <strong>Gesamt: ${allWorkItems.length} Work Items</strong> | 
+                    <strong style="color: #107c10;">${workItemsWithZep.length} mit ZEP-Nummern</strong> | 
+                    <strong style="color: #d13438;">${allWorkItems.length - workItemsWithZep.length} ohne ZEP-Nummern</strong>
+                </div>
+                
+                <div class="results-header">
+                    <div>ID</div>
+                    <div>Titel</div>
+                    <div>Typ</div>
+                    <div>ZEP-Nummern</div>
+                </div>
+            `;
+
+            allWorkItems.forEach(workItem => {
+                const zepNumbers = workItem.fields['Custom.ZEPNummer'] || '';
+                const hasZep = zepNumbers.trim().length > 0;
+                const rowStyle = hasZep ? '' : 'opacity: 0.6;';
+                const workItemUrl = getWorkItemUrl(workItem.id);
+                
+                html += `
+                    <div class="workitem-row" style="${rowStyle}">
+                        <div><a href="${workItemUrl}" target="_blank" class="workitem-id-link">${workItem.id}</a></div>
+                        <div class="workitem-title">${workItem.fields['System.Title'] || 'Ohne Titel'}</div>
+                        <div class="workitem-type">${workItem.fields['System.WorkItemType'] || 'Unbekannt'}</div>
+                        <div class="workitem-zep">${hasZep ? zepNumbers : '(keine ZEP-Nummern)'}</div>
+                    </div>
+                `;
+            });
+
+            resultsContent.innerHTML = html;
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+
+        function hideQueryResults() {
+            document.getElementById('resultsSection').style.display = 'none';
+        }
+
+        function openModal() {
+            const resultsContent = document.getElementById('queryResultsContent').cloneNode(true);
+            const modalBody = document.getElementById('modalBody');
+            
+            // Clear previous content
+            modalBody.innerHTML = '';
+            
+            // Copy the results content to modal
+            modalBody.appendChild(resultsContent);
+            
+            // Update styles for modal view
+            resultsContent.style.maxHeight = 'none';
+            resultsContent.style.fontSize = '13px';
+            
+            // Show modal
+            document.getElementById('modalOverlay').style.display = 'flex';
+            
+            // Prevent body scroll
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget && event.type === 'click') {
+                return; // Only close if clicking the overlay, not the content
+            }
+            
+            document.getElementById('modalOverlay').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        async function previewZepTimes() {
+            const queryId = widgetConfiguration.queryId;
+            
+            console.log('🔍 Widget: previewZepTimes called with queryId:', queryId);
+            
+            if (!queryId) {
+                showStatus('Fehler: Widget nicht konfiguriert. Bitte konfigurieren Sie das Widget.', 'error');
+                return;
+            }
+
+            try {
+                setPreviewTimesLoading(true);
+                showStatus('Lade ZEP-Zeit-Vorschau...', 'info');
+
+                // Execute the query to get work items
+                const workItems = await executeQuery(queryId);
+                
+                if (workItems.length === 0) {
+                    showStatus('Keine Work Items mit ZEP-Nummern in der Query gefunden.', 'warning');
+                    return;
+                }
+
+                showStatus(`${workItems.length} Work Items gefunden. Lade ZEP-Zeiten...`, 'info');
+
+                // Get ZEP times for preview
+                const timesPreview = await getZepTimesPreview(workItems);
+                displayTimesPreview(timesPreview);
+                
+                showStatus(`✅ ZEP-Zeit-Vorschau geladen für ${timesPreview.length} Work Items.`, 'success');
+
+            } catch (error) {
+                console.error('🔍 Widget: Error previewing ZEP times:', error);
+                showStatus(`Fehler beim Laden der ZEP-Zeit-Vorschau: ${error.message}`, 'error');
+            } finally {
+                setPreviewTimesLoading(false);
+            }
+        }
+
+        async function getZepTimesPreview(workItems) {
+            const preview = [];
+            
+            for (const workItem of workItems) {
+                try {
+                    const zepNumbers = workItem.fields['Custom.ZEPNummer'];
+                    const ticketIds = zepNumbers.split(/[,;\\n]/).map(id => id.trim()).filter(id => id);
+                    
+                    let totalPlan = 0;
+                    let totalIst = 0;
+                    const ticketDetails = [];
+
+                    for (const ticketId of ticketIds) {
+                        try {
+                            // Get ticket details for planned hours
+                            const ticketDetail = await getTicketDetails(ticketId);
+                            totalPlan += ticketDetail.plannedHours || 0;
+
+                            // Get time entries for actual hours
+                            const timeEntries = await getTimeEntriesForTicket(ticketId);
+                            const ticketIst = timeEntries.reduce((sum, entry) => sum + entry.duration, 0);
+                            totalIst += ticketIst;
+
+                            ticketDetails.push({
+                                id: ticketId,
+                                plannedHours: ticketDetail.plannedHours || 0,
+                                actualHours: ticketIst
+                            });
+
+                        } catch (error) {
+                            console.error(`Error processing ticket ${ticketId}:`, error);
+                            ticketDetails.push({
+                                id: ticketId,
+                                plannedHours: 0,
+                                actualHours: 0,
+                                error: error.message
+                            });
+                        }
+                    }
+
+                    preview.push({
+                        workItem: workItem,
+                        zepNumbers: zepNumbers,
+                        ticketDetails: ticketDetails,
+                        totalPlan: totalPlan,
+                        totalIst: totalIst,
+                        currentPlan: workItem.fields['Custom.Plan'] || 0,
+                        currentIst: workItem.fields['Custom.Ist'] || 0
+                    });
+
+                    // Small delay to prevent API throttling
+                    await new Promise(resolve => setTimeout(resolve, 100));
+
+                } catch (error) {
+                    console.error(`Error processing work item ${workItem.id}:`, error);
+                    preview.push({
+                        workItem: workItem,
+                        error: error.message
+                    });
+                }
+            }
+            
+            return preview;
+        }
+
+        function displayTimesPreview(timesPreview) {
+            const resultsContent = document.getElementById('queryResultsContent');
+            
+            let updatesCount = timesPreview.filter(item => 
+                !item.error && (item.totalPlan !== item.currentPlan || item.totalIst !== item.currentIst)
+            ).length;
+            
+            let html = `
+                <div style="margin-bottom: 16px;">
+                    <strong>ZEP-Zeit-Vorschau</strong> | 
+                    <strong style="color: #107c10;">${updatesCount} Updates verfügbar</strong> | 
+                    <strong style="color: #605e5c;">${timesPreview.length - updatesCount} bereits aktuell</strong>
+                </div>
+                
+                <div class="results-header">
+                    <div>Work Item</div>
+                    <div>ZEP-Tickets</div>
+                    <div>Plan (Aktuell → Neu)</div>
+                    <div>Ist (Aktuell → Neu)</div>
+                </div>
+            `;
+
+            timesPreview.forEach(item => {
+                if (item.error) {
+                    const workItemUrl = getWorkItemUrl(item.workItem.id);
+                    html += `
+                        <div class="workitem-row" style="background-color: #fde7e9;">
+                            <div><a href="${workItemUrl}" target="_blank" class="workitem-id-link">${item.workItem.id}</a></div>
+                            <div style="color: #a4262c;">Fehler</div>
+                            <div colspan="2" style="color: #a4262c;">${item.error}</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const planChanged = item.totalPlan !== item.currentPlan;
+                const istChanged = item.totalIst !== item.currentIst;
+                const hasChanges = planChanged || istChanged;
+                
+                const rowStyle = hasChanges ? 'background-color: #dff6dd;' : 'opacity: 0.7;';
+                const workItemUrl = getWorkItemUrl(item.workItem.id);
+                
+                html += `
+                    <div class="workitem-row" style="${rowStyle}">
+                        <div>
+                            <div><a href="${workItemUrl}" target="_blank" class="workitem-id-link">${item.workItem.id}</a></div>
+                            <div style="font-size: 10px; color: #605e5c;">${item.workItem.fields['System.Title']}</div>
+                        </div>
+                        <div class="workitem-zep">${item.zepNumbers}</div>
+                        <div style="font-family: monospace; font-size: 11px;">
+                            ${planChanged ? `<strong>${item.currentPlan} → ${item.totalPlan}</strong>` : item.currentPlan}
+                        </div>
+                        <div style="font-family: monospace; font-size: 11px;">
+                            ${istChanged ? `<strong>${item.currentIst} → ${item.totalIst}</strong>` : item.currentIst}
+                        </div>
+                    </div>
+                `;
+            });
+
+            resultsContent.innerHTML = html;
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+
+        function setPreviewLoading(isLoading) {
+            const button = document.getElementById('previewQueryButton');
+            
+            if (isLoading) {
+                button.disabled = true;
+                button.innerHTML = '<span class="loading-spinner"></span>Lädt...';
+            } else {
+                button.disabled = false;
+                button.textContent = 'Query-Daten anzeigen';
+            }
+        }
+
+        function setPreviewTimesLoading(isLoading) {
+            const button = document.getElementById('previewTimesButton');
+            
+            if (isLoading) {
+                button.disabled = true;
+                button.innerHTML = '<span class="loading-spinner"></span>Lädt...';
+            } else {
+                button.disabled = false;
+                button.textContent = 'Zeiten-Update vorschau';
+            }
+        }
+
+        async function updateZepTimes() {
+            const queryId = widgetConfiguration.queryId;
+            
+            console.log('🔍 Widget: updateZepTimes called with queryId:', queryId);
+            
+            if (!queryId) {
+                showStatus('Fehler: Widget nicht konfiguriert. Bitte konfigurieren Sie das Widget.', 'error');
+                return;
+            }
+
+            try {
+                setLoading(true);
+                showStatus('Starte ZEP-Zeit-Update...', 'info');
+                
+                // Execute the query to get work items
+                showStatus('Führe Query aus...', 'info');
+                const workItems = await executeQuery(queryId);
+                
+                if (workItems.length === 0) {
+                    showStatus('Keine Work Items in der Query gefunden.', 'warning');
+                    return;
+                }
+
+                showStatus(`${workItems.length} Work Items gefunden. Verarbeite ZEP-Zeiten...`, 'info');
+                
+                // Show progress section
+                document.getElementById('progressSection').style.display = 'block';
+                document.getElementById('statsGrid').style.display = 'grid';
+                
+                let processedCount = 0;
+                let updatedCount = 0;
+                
+                // Process each work item
+                for (const workItem of workItems) {
+                    try {
+                        updateProgress(processedCount, workItems.length, `Verarbeite Work Item ${workItem.id}...`);
+                        
+                        const wasUpdated = await processWorkItem(workItem);
+                        if (wasUpdated) {
+                            updatedCount++;
+                        }
+                        
+                        processedCount++;
+                        updateStats(processedCount, updatedCount);
+                        
+                        // Small delay to prevent API throttling
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                    } catch (error) {
+                        console.error(`Error processing work item ${workItem.id}:`, error);
+                        processedCount++;
+                        updateStats(processedCount, updatedCount);
+                    }
+                }
+                
+                updateProgress(processedCount, workItems.length, 'Abgeschlossen');
+                showStatus(`✅ Erfolgreich abgeschlossen! ${updatedCount} von ${processedCount} Work Items aktualisiert.`, 'success');
+                
+            } catch (error) {
+                console.error('Error updating ZEP times:', error);
+                showStatus(`Fehler beim Aktualisieren der ZEP-Zeiten: ${error.message}`, 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function executeQuery(queryId) {
+            try {
+                const queryResult = await workItemTrackingClient.queryById(queryId, projectId);
+                
+                if (!queryResult.workItems || queryResult.workItems.length === 0) {
+                    return [];
+                }
+                
+                // Get work item IDs
+                const workItemIds = queryResult.workItems.map(wi => wi.id);
+                
+                // Get detailed work item data
+                const workItems = await workItemTrackingClient.getWorkItems(workItemIds, null, null, 'All');
+                
+                // Filter only work items that have Custom.ZEPNummer field
+                return workItems.filter(wi => 
+                    wi.fields && 
+                    wi.fields['Custom.ZEPNummer'] && 
+                    wi.fields['Custom.ZEPNummer'].trim()
+                );
+                
+            } catch (error) {
+                console.error('Error executing query:', error);
+                throw new Error(`Query-Ausführung fehlgeschlagen: ${error.message}`);
+            }
+        }
+
+        async function processWorkItem(workItem) {
+            try {
+                const zepNumbers = workItem.fields['Custom.ZEPNummer'];
+                if (!zepNumbers) {
+                    console.log(`Work Item ${workItem.id} has no ZEP numbers`);
+                    return false;
+                }
+
+                const ticketIds = zepNumbers.split(/[,;\\n]/).map(id => id.trim()).filter(id => id);
+                if (ticketIds.length === 0) {
+                    console.log(`Work Item ${workItem.id} has no valid ZEP ticket IDs`);
+                    return false;
+                }
+
+                let totalPlan = 0;
+                let totalIst = 0;
+
+                // Process each ZEP ticket
+                for (const ticketId of ticketIds) {
+                    try {
+                        // Get ticket details for planned hours
+                        const ticketDetail = await getTicketDetails(ticketId);
+                        totalPlan += ticketDetail.plannedHours || 0;
+
+                        // Get time entries for actual hours
+                        const timeEntries = await getTimeEntriesForTicket(ticketId);
+                        const ticketIst = timeEntries.reduce((sum, entry) => sum + entry.duration, 0);
+                        totalIst += ticketIst;
+
+                    } catch (error) {
+                        console.error(`Error processing ticket ${ticketId}:`, error);
+                        // Continue with other tickets
+                    }
+                }
+
+                // Update work item fields
+                const fieldsToUpdate = {};
+                
+                if (totalPlan > 0) {
+                    fieldsToUpdate['Custom.Plan'] = totalPlan;
+                }
+                
+                if (totalIst > 0) {
+                    fieldsToUpdate['Custom.Ist'] = totalIst;
+                }
+
+                if (Object.keys(fieldsToUpdate).length > 0) {
+                    const patchDocument = Object.keys(fieldsToUpdate).map(field => ({
+                        op: 'add',
+                        path: `/fields/${field}`,
+                        value: fieldsToUpdate[field]
+                    }));
+
+                    await workItemTrackingClient.updateWorkItem(patchDocument, workItem.id);
+                    console.log(`Updated work item ${workItem.id} with Plan: ${totalPlan}, Ist: ${totalIst}`);
+                    return true;
+                }
+
+                return false;
+
+            } catch (error) {
+                console.error(`Error processing work item ${workItem.id}:`, error);
+                throw error;
+            }
+        }
+
+        async function getTicketDetails(ticketId) {
+            try {
+                const proxyUrl = 'https://zepextension.onrender.com/api/zep';
+                const url = `${proxyUrl}/tickets/${ticketId}`;
+
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {},
+                    mode: 'cors',
+                    credentials: 'omit',
+                    referrerPolicy: 'no-referrer'
+                });
+
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        console.warn(`Ticket ${ticketId} not found`);
+                        return {
+                            id: ticketId,
+                            plannedHours: 0
+                        };
+                    }
+                    throw new Error(`Failed to fetch ticket ${ticketId}: ${response.statusText}`);
+                }
+
+                const ticketData = await response.json();
+                const ticket = ticketData.data || ticketData;
+
+                return {
+                    id: ticket.id ? ticket.id.toString() : ticketId,
+                    plannedHours: ticket.planned_hours || 0
+                };
+
+            } catch (error) {
+                console.error(`Failed to fetch ticket details for ${ticketId}:`, error);
+                return {
+                    id: ticketId,
+                    plannedHours: 0
+                };
+            }
+        }
+
+        async function getTimeEntriesForTicket(ticketId) {
+            try {
+                const proxyUrl = 'https://zepextension.onrender.com/api/zep';
+                const url = `${proxyUrl}/attendances`;
+                
+                const params = new URLSearchParams({
+                    ticket_id: ticketId,
+                    limit: '100',
+                    page: '1'
+                });
+
+                const response = await fetch(`${url}?${params}`, {
+                    method: 'GET',
+                    headers: {},
+                    mode: 'cors',
+                    credentials: 'omit',
+                    referrerPolicy: 'no-referrer'
+                });
+
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        console.log(`No time entries found for ticket ${ticketId}`);
+                        return [];
+                    }
+                    throw new Error(`Failed to fetch time entries for ticket ${ticketId}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.data && Array.isArray(data.data)) {
+                    return data.data.map(item => ({
+                        id: item.id.toString(),
+                        ticketId: ticketId,
+                        duration: item.duration || 0
+                    }));
+                }
+
+                return [];
+
+            } catch (error) {
+                console.error(`Error fetching time entries for ticket ${ticketId}:`, error);
+                return [];
+            }
+        }
+
+        function updateProgress(current, total, message) {
+            const percentage = total > 0 ? (current / total) * 100 : 0;
+            document.getElementById('progressFill').style.width = `${percentage}%`;
+            document.getElementById('progressText').textContent = message || `${current} von ${total} Work Items verarbeitet`;
+        }
+
+        function updateStats(processed, updated) {
+            document.getElementById('processedCount').textContent = processed;
+            document.getElementById('updatedCount').textContent = updated;
+        }
+
+        function setLoading(isLoading) {
+            const button = document.getElementById('updateButton');
+            
+            if (isLoading) {
+                button.disabled = true;
+                button.innerHTML = '<span class="loading-spinner"></span>Verarbeite...';
+            } else {
+                button.disabled = false;
+                button.textContent = widgetConfiguration.buttonText || 'Zeiten aktualisieren';
+                document.getElementById('progressSection').style.display = 'none';
+            }
+        }
+
+        function showStatus(message, type = 'info') {
+            const container = document.getElementById('statusSection');
+            container.innerHTML = `
+                <div class="status-message status-${type}">
+                    ${message}
+                </div>
+            `;
+            
+            // Auto-hide success messages after 10 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    container.innerHTML = '';
+                }, 10000);
+            }
+        }
+    </script>
+</body>
+</html> 

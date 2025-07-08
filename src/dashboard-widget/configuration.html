@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZEP Widget Konfiguration</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: transparent;
+            font-size: 14px;
+            color: #323130;
+        }
+
+        .config-container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .config-section {
+            margin-bottom: 24px;
+        }
+
+        .config-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #323130;
+        }
+
+        .config-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #8a8886;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        .config-input:focus {
+            outline: none;
+            border-color: #0078d4;
+            box-shadow: 0 0 0 1px #0078d4;
+        }
+
+        .config-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #8a8886;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        .config-select:focus {
+            outline: none;
+            border-color: #0078d4;
+            box-shadow: 0 0 0 1px #0078d4;
+        }
+
+        .color-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .color-option {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+
+        .color-option.selected {
+            border-color: #323130;
+            transform: scale(1.1);
+        }
+
+        .custom-color-section {
+            margin-top: 12px;
+        }
+
+        .color-input-container {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .color-picker {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .description {
+            font-size: 12px;
+            color: #605e5c;
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        .preview-section {
+            margin-top: 24px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #edebe9;
+        }
+
+        .preview-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #323130;
+        }
+
+        .preview-widget {
+            background: white;
+            padding: 16px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .preview-header {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #edebe9;
+        }
+
+        .preview-widget-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0;
+            color: #323130;
+        }
+
+        .preview-widget-subtitle {
+            font-size: 12px;
+            color: #605e5c;
+            margin: 4px 0 0 0;
+        }
+
+        .preview-button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            min-width: 120px;
+            color: white;
+            background: #0078d4;
+        }
+
+        .loading-container {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #605e5c;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #0078d4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #fde7e9;
+            color: #a4262c;
+            border: 1px solid #d13438;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 12px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="config-container">
+        <div class="loading-container" id="loadingContainer">
+            <div class="loading-spinner"></div>
+            Lade Queries...
+        </div>
+
+        <div id="configForm" style="display: none;">
+            <div class="config-section">
+                <label class="config-label" for="widgetTitle">Widget-Titel</label>
+                <input type="text" id="widgetTitle" class="config-input" 
+                       value="ZEP Zeiten aktualisieren" placeholder="Widget-Titel eingeben">
+                <div class="description">Dieser Titel wird im Widget-Header angezeigt</div>
+            </div>
+
+            <div class="config-section">
+                <label class="config-label" for="querySelect">Query auswählen</label>
+                <select id="querySelect" class="config-select">
+                    <option value="">Bitte Query auswählen...</option>
+                </select>
+                <div class="description">Wählen Sie eine gespeicherte DevOps-Query aus, um Work Items zu verarbeiten</div>
+            </div>
+
+            <div class="config-section">
+                <label class="config-label" for="buttonText">Button-Beschriftung</label>
+                <input type="text" id="buttonText" class="config-input" 
+                       value="Zeiten aktualisieren" placeholder="Button-Text eingeben">
+                <div class="description">Text, der auf dem Action-Button angezeigt wird</div>
+            </div>
+
+            <div class="config-section">
+                <label class="config-label">Button-Farbe</label>
+                <div class="color-options">
+                    <div class="color-option selected" data-color="#0078d4" style="background-color: #0078d4;" title="Azure Blue"></div>
+                    <div class="color-option" data-color="#107c10" style="background-color: #107c10;" title="Green"></div>
+                    <div class="color-option" data-color="#d13438" style="background-color: #d13438;" title="Red"></div>
+                    <div class="color-option" data-color="#ffaa44" style="background-color: #ffaa44;" title="Orange"></div>
+                    <div class="color-option" data-color="#8764b8" style="background-color: #8764b8;" title="Purple"></div>
+                    <div class="color-option" data-color="#00bcf2" style="background-color: #00bcf2;" title="Cyan"></div>
+                </div>
+                <div class="custom-color-section">
+                    <label class="config-label" for="customColor">Oder benutzerdefinierte Farbe:</label>
+                    <div class="color-input-container">
+                        <input type="color" id="customColor" class="color-picker" value="#0078d4">
+                        <input type="text" id="customColorText" class="config-input" value="#0078d4" 
+                               placeholder="#ffffff" style="flex: 1;">
+                    </div>
+                </div>
+            </div>
+
+            <div class="preview-section">
+                <div class="preview-title">Vorschau</div>
+                <div class="preview-widget">
+                    <div class="preview-header">
+                        <h3 class="preview-widget-title" id="previewTitle">ZEP Zeiten aktualisieren</h3>
+                        <p class="preview-widget-subtitle" id="previewSubtitle">Klicken Sie auf den Button, um ZEP-Zeiten zu aktualisieren</p>
+                    </div>
+                    <button class="preview-button" id="previewButton">Zeiten aktualisieren</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="errorContainer"></div>
+    </div>
+
+    <script src="../../lib/SDK/VSS.SDK.min.js"></script>
+    <script type="text/javascript">
+        let workItemTrackingClient;
+        let projectId;
+        let currentConfig = {
+            title: 'ZEP Zeiten aktualisieren',
+            buttonText: 'Zeiten aktualisieren',
+            buttonColor: '#0078d4',
+            queryId: null
+        };
+
+        // Initialize VSS SDK
+        VSS.init({
+            explicitNotifyLoaded: true,
+            usePlatformStyles: true
+        });
+
+        VSS.require(["TFS/Dashboards/WidgetHelpers", "TFS/WorkItemTracking/RestClient"], 
+            function (WidgetHelpers, TFS_Wit_WebApi) {
+                WidgetHelpers.IncludeWidgetStyles();
+                
+                // Store the modules globally
+                window.WorkItemTrackingRestClient = TFS_Wit_WebApi;
+                window.WidgetHelpers = WidgetHelpers;
+                
+                VSS.register("ZepDashboardWidget.Configuration", function () {
+                    return {
+                        load: function (widgetSettings, widgetConfigurationContext) {
+                            // Store widgetConfigurationContext for later use
+                            window.widgetConfigurationContext = widgetConfigurationContext;
+                            
+                            // Initialize and load queries
+                            initializeConfiguration().then(function() {
+                                // Setup event listeners after initialization
+                                setupEventListeners();
+                                
+                                // Load existing configuration if available
+                                if (widgetSettings.customSettings && widgetSettings.customSettings.data) {
+                                    var settings = JSON.parse(widgetSettings.customSettings.data);
+                                    currentConfig = {...currentConfig, ...settings};
+                                    
+                                    // Apply loaded settings to form elements
+                                    document.getElementById('widgetTitle').value = currentConfig.title;
+                                    document.getElementById('buttonText').value = currentConfig.buttonText;
+                                    document.getElementById('customColor').value = currentConfig.buttonColor;
+                                    document.getElementById('customColorText').value = currentConfig.buttonColor;
+                                    
+                                    if (currentConfig.queryId) {
+                                        document.getElementById('querySelect').value = currentConfig.queryId;
+                                    }
+                                    
+                                    updatePreview();
+                                }
+                            });
+                            
+                            return WidgetHelpers.WidgetStatusHelper.Success();
+                        },
+                        onSave: function () {
+                            console.log('🔍 Configuration: onSave called with config:', currentConfig);
+                            
+                            var customSettings = {
+                                data: JSON.stringify(currentConfig)
+                            };
+                            
+                            console.log('🔍 Configuration: Saving with custom settings:', customSettings);
+                            return WidgetHelpers.WidgetConfigurationSave.Valid(customSettings);
+                        }
+                    };
+                });
+                VSS.notifyLoadSucceeded();
+            }
+        );
+
+        async function initializeConfiguration() {
+            try {
+                console.log('🔍 Configuration: Starting initialization');
+                
+                // Get project context
+                const context = VSS.getWebContext();
+                console.log('🔍 Configuration: VSS context:', context);
+                projectId = context.project.id;
+                console.log('🔍 Configuration: Project ID:', projectId);
+                
+                // Get work item tracking client
+                console.log('🔍 Configuration: Getting WorkItemTrackingRestClient');
+                workItemTrackingClient = window.WorkItemTrackingRestClient.getClient();
+                console.log('🔍 Configuration: WorkItemTrackingClient obtained:', !!workItemTrackingClient);
+                
+                // Load queries
+                console.log('🔍 Configuration: About to load queries');
+                await loadQueries();
+                console.log('🔍 Configuration: Queries loaded successfully');
+                
+                // Show form
+                console.log('🔍 Configuration: Showing configuration form');
+                document.getElementById('loadingContainer').style.display = 'none';
+                document.getElementById('configForm').style.display = 'block';
+                
+            } catch (error) {
+                console.error('🔍 Configuration: Error initializing configuration:', error);
+                console.error('🔍 Configuration: Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    contextAvailable: !!VSS.getWebContext(),
+                    projectId: projectId
+                });
+                showError('Fehler beim Laden der Konfiguration: ' + error.message);
+            }
+        }
+
+        async function loadQueries() {
+            try {
+                console.log('🔍 Configuration: Starting to load queries for project:', projectId);
+                console.log('🔍 Configuration: WorkItemTrackingClient available:', !!workItemTrackingClient);
+                
+                // Get shared queries
+                console.log('🔍 Configuration: Calling getQueries with projectId:', projectId);
+                const queryHierarchy = await workItemTrackingClient.getQueries(projectId, 'All', 2);
+                
+                console.log('🔍 Configuration: Query hierarchy received:', queryHierarchy);
+                console.log('🔍 Configuration: Query hierarchy length:', queryHierarchy ? queryHierarchy.length : 'null/undefined');
+                
+                const querySelect = document.getElementById('querySelect');
+                querySelect.innerHTML = '<option value="">Bitte Query auswählen...</option>';
+                
+                if (queryHierarchy && queryHierarchy.length > 0) {
+                    console.log('🔍 Configuration: Adding queries to dropdown');
+                    queryHierarchy.forEach((item, index) => {
+                        console.log(`🔍 Configuration: Processing query item ${index}:`, item);
+                        addQueriesToDropdown(item, querySelect, '');
+                    });
+                    
+                    console.log('🔍 Configuration: Final dropdown options count:', querySelect.options.length);
+                } else {
+                    console.warn('🔍 Configuration: No queries found in hierarchy');
+                    showError('Keine Queries im Projekt gefunden. Stellen Sie sicher, dass Sie gespeicherte Queries haben.');
+                }
+                
+            } catch (error) {
+                console.error('🔍 Configuration: Error loading queries:', error);
+                console.error('🔍 Configuration: Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    projectId: projectId,
+                    clientAvailable: !!workItemTrackingClient
+                });
+                showError('Fehler beim Laden der Queries: ' + error.message);
+            }
+        }
+
+        function addQueriesToDropdown(queryItem, selectElement, prefix) {
+            console.log('🔍 Configuration: Processing query item for dropdown:', {
+                name: queryItem.name,
+                id: queryItem.id,
+                hasChildren: !!queryItem.children,
+                childrenCount: queryItem.children ? queryItem.children.length : 0,
+                prefix: prefix
+            });
+            
+            if (queryItem.children && queryItem.children.length > 0) {
+                // This is a folder
+                console.log(`🔍 Configuration: Processing folder "${queryItem.name}" with ${queryItem.children.length} children`);
+                queryItem.children.forEach((child, index) => {
+                    console.log(`🔍 Configuration: Processing child ${index} of folder "${queryItem.name}":`, child);
+                    addQueriesToDropdown(child, selectElement, prefix + queryItem.name + '/');
+                });
+            } else if (queryItem.id) {
+                // This is a query
+                console.log(`🔍 Configuration: Adding query "${queryItem.name}" with ID "${queryItem.id}" to dropdown`);
+                const option = document.createElement('option');
+                option.value = queryItem.id;
+                option.textContent = prefix + queryItem.name;
+                selectElement.appendChild(option);
+                console.log(`🔍 Configuration: Successfully added option: "${option.textContent}" (${option.value})`);
+            } else {
+                console.log(`🔍 Configuration: Skipping item "${queryItem.name}" - no ID and no children`);
+            }
+        }
+
+        function setupEventListeners() {
+            // Widget title
+            document.getElementById('widgetTitle').addEventListener('input', (e) => {
+                currentConfig.title = e.target.value;
+                updatePreview();
+                notifyConfigurationChange();
+            });
+
+            // Query selection
+            document.getElementById('querySelect').addEventListener('change', (e) => {
+                currentConfig.queryId = e.target.value;
+                updatePreview();
+                notifyConfigurationChange();
+            });
+
+            // Button text
+            document.getElementById('buttonText').addEventListener('input', (e) => {
+                currentConfig.buttonText = e.target.value;
+                updatePreview();
+                notifyConfigurationChange();
+            });
+
+            // Color options
+            document.querySelectorAll('.color-option').forEach(option => {
+                option.addEventListener('click', (e) => {
+                    // Remove selected class from all options
+                    document.querySelectorAll('.color-option').forEach(opt => 
+                        opt.classList.remove('selected'));
+                    
+                    // Add selected class to clicked option
+                    e.target.classList.add('selected');
+                    
+                    const color = e.target.dataset.color;
+                    currentConfig.buttonColor = color;
+                    
+                    // Update color inputs
+                    document.getElementById('customColor').value = color;
+                    document.getElementById('customColorText').value = color;
+                    
+                    updatePreview();
+                    notifyConfigurationChange();
+                });
+            });
+
+            // Custom color picker
+            document.getElementById('customColor').addEventListener('change', (e) => {
+                const color = e.target.value;
+                currentConfig.buttonColor = color;
+                document.getElementById('customColorText').value = color;
+                
+                // Remove selected class from predefined options
+                document.querySelectorAll('.color-option').forEach(opt => 
+                    opt.classList.remove('selected'));
+                
+                updatePreview();
+                notifyConfigurationChange();
+            });
+
+            // Custom color text input
+            document.getElementById('customColorText').addEventListener('input', (e) => {
+                const color = e.target.value;
+                if (isValidColor(color)) {
+                    currentConfig.buttonColor = color;
+                    document.getElementById('customColor').value = color;
+                    
+                    // Remove selected class from predefined options
+                    document.querySelectorAll('.color-option').forEach(opt => 
+                        opt.classList.remove('selected'));
+                    
+                    updatePreview();
+                    notifyConfigurationChange();
+                }
+            });
+        }
+
+        function notifyConfigurationChange() {
+            // Notify the widget framework that configuration has changed
+            if (window.widgetConfigurationContext && window.widgetConfigurationContext.notify) {
+                var customSettings = {
+                    data: JSON.stringify(currentConfig)
+                };
+                var eventName = window.WidgetHelpers.WidgetEvent.ConfigurationChange;
+                var eventArgs = window.WidgetHelpers.WidgetEvent.Args(customSettings);
+                window.widgetConfigurationContext.notify(eventName, eventArgs);
+            }
+        }
+
+        function isValidColor(color) {
+            const style = new Option().style;
+            style.color = color;
+            return style.color !== '';
+        }
+
+        function updatePreview() {
+            // Update preview title
+            document.getElementById('previewTitle').textContent = currentConfig.title;
+            
+            // Update preview subtitle
+            const subtitle = currentConfig.queryId 
+                ? `Query ID: ${currentConfig.queryId} - Klicken Sie auf den Button, um ZEP-Zeiten zu aktualisieren`
+                : 'Bitte konfigurieren Sie das Widget mit einer Query';
+            document.getElementById('previewSubtitle').textContent = subtitle;
+            
+            // Update preview button
+            const previewButton = document.getElementById('previewButton');
+            previewButton.textContent = currentConfig.buttonText;
+            previewButton.style.backgroundColor = currentConfig.buttonColor;
+            previewButton.style.color = getContrastColor(currentConfig.buttonColor);
+        }
+
+        function getContrastColor(hexColor) {
+            // Remove # if present
+            const hex = hexColor.replace('#', '');
+            
+            // Convert to RGB
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            
+            // Calculate luminance
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            
+            return luminance > 0.5 ? '#000000' : '#ffffff';
+        }
+
+
+
+        function showError(message) {
+            const container = document.getElementById('errorContainer');
+            container.innerHTML = `<div class="error-message">${message}</div>`;
+            
+            document.getElementById('loadingContainer').style.display = 'none';
+            document.getElementById('configForm').style.display = 'block';
+        }
+    </script>
+</body>
+</html> 

@@ -2,9 +2,9 @@
   "manifestVersion": 1,
   "id": "zep-time-tracker-browser",
   "publisher": "GOpus",
-      "version": "1.0.60",
+  "version": "2.0.20",
   "name": "ZEP Time Tracker (Browser Edition)",
-  "description": "Proxy-based ZEP time tracking integration for Azure DevOps - no configuration required",
+  "description": "ZEP time tracking integration for Azure DevOps with work item forms and dashboard batch updates - no configuration required",
   "public": false,
   "targets": [
     {
@@ -13,7 +13,8 @@
   ],
   "scopes": [
     "vso.work",
-    "vso.work_write"
+    "vso.work_write",
+    "vso.dashboards"
   ],
   "repository": {
     "type": "git",
@@ -24,12 +25,15 @@
     "theme": "light"
   },
   "categories": [
-    "Azure Boards"
+    "Azure Boards",
+    "Plan and track"
   ],
   "tags": [
     "ZEP",
     "time tracking",
     "work items",
+    "dashboard",
+    "batch update",
     "Zeiterfassung"
   ],
   "screenshots": [],
@@ -44,7 +48,11 @@
       "addressable": true
     },
     {
-      "path": "node_modules/azure-devops-extension-sdk",
+      "path": "images",
+      "addressable": true
+    },
+    {
+      "path": "node_modules/vss-web-extension-sdk/lib",
       "addressable": true,
       "packagePath": "lib/SDK"
     }
@@ -59,18 +67,123 @@
       "properties": {
         "name": "ZEP Time Tracker",
         "uri": "src/workitem-group/workitem-group.html",
-        "height": 400,
+        "height": 600
+      }
+    },
+    {
+      "id": "zep-time-tracker-workitem-control",
+      "type": "ms.vss-work-web.work-item-form-control",
+      "targets": [
+        "ms.vss-work-web.work-item-form"
+      ],
+      "properties": {
+        "name": "ZEP Time Tracker Control",
+        "uri": "src/workitem-group/workitem-group.html",
+        "height": 600,
         "inputs": [
           {
             "id": "FieldName",
-            "name": "Field Name",
-            "description": "The name of the work item field",
+            "name": "Field Name", 
+            "description": "Field to bind to",
             "type": "WorkItemField",
             "properties": {
               "workItemFieldTypes": ["String"]
+            },
+            "validation": {
+              "dataType": "String",
+              "isRequired": false
             }
           }
         ]
+      }
+    },
+    {
+      "id": "ZepDashboardWidget",
+      "type": "ms.vss-dashboards-web.widget",
+      "targets": [
+        "ms.vss-dashboards-web.widget-catalog",
+        "GOpus.zep-time-tracker-browser.ZepDashboardWidget.Configuration"
+      ],
+      "properties": {
+        "name": "ZEP Time Batch Update",
+        "description": "Batch-update ZEP time data for multiple work items using a query",
+        "uri": "src/dashboard-widget/dashboard-widget.html",
+        "catalogIconUrl": "images/icon.png",
+        "previewImageUrl": "images/preview.png",
+        "supportedSizes": [
+          {"rowSpan": 1, "columnSpan": 1},
+          {"rowSpan": 1, "columnSpan": 2},
+          {"rowSpan": 1, "columnSpan": 3},
+          {"rowSpan": 1, "columnSpan": 4},
+          {"rowSpan": 1, "columnSpan": 5},
+          {"rowSpan": 2, "columnSpan": 1},
+          {"rowSpan": 2, "columnSpan": 2},
+          {"rowSpan": 2, "columnSpan": 3},
+          {"rowSpan": 2, "columnSpan": 4},
+          {"rowSpan": 2, "columnSpan": 5},
+          {"rowSpan": 2, "columnSpan": 6},
+          {"rowSpan": 3, "columnSpan": 1},
+          {"rowSpan": 3, "columnSpan": 2},
+          {"rowSpan": 3, "columnSpan": 3},
+          {"rowSpan": 3, "columnSpan": 4},
+          {"rowSpan": 3, "columnSpan": 5},
+          {"rowSpan": 3, "columnSpan": 6},
+          {"rowSpan": 4, "columnSpan": 1},
+          {"rowSpan": 4, "columnSpan": 2},
+          {"rowSpan": 4, "columnSpan": 3},
+          {"rowSpan": 4, "columnSpan": 4},
+          {"rowSpan": 4, "columnSpan": 5},
+          {"rowSpan": 4, "columnSpan": 6},
+          {"rowSpan": 5, "columnSpan": 1},
+          {"rowSpan": 5, "columnSpan": 2},
+          {"rowSpan": 5, "columnSpan": 3},
+          {"rowSpan": 5, "columnSpan": 4},
+          {"rowSpan": 5, "columnSpan": 5},
+          {"rowSpan": 5, "columnSpan": 6},
+          {"rowSpan": 6, "columnSpan": 1},
+          {"rowSpan": 6, "columnSpan": 2},
+          {"rowSpan": 6, "columnSpan": 3},
+          {"rowSpan": 6, "columnSpan": 4},
+          {"rowSpan": 6, "columnSpan": 5},
+          {"rowSpan": 6, "columnSpan": 6},
+          {"rowSpan": 7, "columnSpan": 1},
+          {"rowSpan": 7, "columnSpan": 2},
+          {"rowSpan": 7, "columnSpan": 3},
+          {"rowSpan": 7, "columnSpan": 4},
+          {"rowSpan": 7, "columnSpan": 5},
+          {"rowSpan": 7, "columnSpan": 6},
+          {"rowSpan": 8, "columnSpan": 1},
+          {"rowSpan": 8, "columnSpan": 2},
+          {"rowSpan": 8, "columnSpan": 3},
+          {"rowSpan": 8, "columnSpan": 4},
+          {"rowSpan": 8, "columnSpan": 5},
+          {"rowSpan": 8, "columnSpan": 6},
+          {"rowSpan": 9, "columnSpan": 1},
+          {"rowSpan": 9, "columnSpan": 2},
+          {"rowSpan": 9, "columnSpan": 3},
+          {"rowSpan": 9, "columnSpan": 4},
+          {"rowSpan": 9, "columnSpan": 5},
+          {"rowSpan": 9, "columnSpan": 6},
+          {"rowSpan": 10, "columnSpan": 1},
+          {"rowSpan": 10, "columnSpan": 2},
+          {"rowSpan": 10, "columnSpan": 3},
+          {"rowSpan": 10, "columnSpan": 4},
+          {"rowSpan": 10, "columnSpan": 5},
+          {"rowSpan": 10, "columnSpan": 6}
+        ],
+        "supportedScopes": ["project_team"]
+      }
+    },
+    {
+      "id": "ZepDashboardWidget.Configuration",
+      "type": "ms.vss-dashboards-web.widget-configuration",
+      "targets": [
+        "ms.vss-dashboards-web.widget-configuration"
+      ],
+      "properties": {
+        "name": "ZEP Time Batch Update Configuration",
+        "description": "Configure the ZEP time batch update widget",
+        "uri": "src/dashboard-widget/configuration.html"
       }
     }
   ]

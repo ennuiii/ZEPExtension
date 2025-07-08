@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ZEP Time Tracker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"></script>
+    <script>
+        window.requirejs.config({
+            enforceDefine: true,
+            paths: {
+                'SDK': './lib/SDK.min'
+            }
+        });
+        window.requirejs(['SDK'], function (SDK) {
+            if (typeof SDK !== 'undefined') {
+                console.log("SDK is defined. Trying to initialize...");
+                SDK.init();
+                SDK.ready().then(() => {
+                    console.log("SDK is ready");
+                    document.getElementById("name").innerText = SDK.getUser().displayName;
+                });
+            } else {
+                console.log('SDK is not defined');
+            }
+        });
+    </script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 12px;
+            margin: 0;
+            color: #323130;
+            background: #f3f2f1;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #0078d4;
+            color: white;
+            padding: 16px 20px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .header h2 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .controls {
+            padding: 18px 24px;
+            background: #faf9f8;
+            border-bottom: 1px solid #edebe9;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .filter-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #605e5c;
+        }
+
+        .filter-group input, .filter-group select {
+            padding: 6px 8px;
+            border: 1px solid #d1d1d1;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .filter-group input:focus, .filter-group select:focus {
+            outline: none;
+            border-color: #0078d4;
+            box-shadow: 0 0 0 1px #0078d4;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid #d1d1d1;
+            border-radius: 4px;
+            background: white;
+            color: #323130;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background: #f3f2f1;
+            border-color: #c7c6c4;
+        }
+
+        .btn.primary {
+            background: #0078d4;
+            color: white;
+            border-color: #0078d4;
+        }
+
+        .btn.primary:hover {
+            background: #106ebe;
+            border-color: #106ebe;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .summary-section {
+            padding: 24px;
+            border-bottom: 1px solid #edebe9;
+        }
+
+        .summary-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .summary-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #323130;
+        }
+
+        .overall-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .summary-card {
+            background: #f8f8f8;
+            border: 1px solid #edebe9;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .summary-card h4 {
+            margin: 0 0 10px 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #605e5c;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .summary-card .value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #323130;
+            margin-bottom: 6px;
+        }
+
+        .summary-card .label {
+            font-size: 14px;
+            color: #605e5c;
+        }
+
+        .planned-vs-actual {
+            color: #0078d4;
+        }
+
+        .ticket-summaries {
+            margin-top: 16px;
+        }
+
+        .ticket-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border: 1px solid #edebe9;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            background: white;
+        }
+
+        .ticket-info {
+            flex: 1;
+        }
+
+        .ticket-id {
+            font-weight: 600;
+            color: #323130;
+            margin-bottom: 2px;
+        }
+
+        .ticket-title {
+            font-size: 12px;
+            color: #605e5c;
+        }
+
+        .ticket-hours {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        .actual-hours {
+            color: #0078d4;
+            font-weight: 600;
+        }
+
+        .planned-hours {
+            color: #605e5c;
+        }
+
+        .entries-section {
+            padding: 20px;
+        }
+
+        .entries-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .entries-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #323130;
+        }
+
+        .entries-count {
+            font-size: 13px;
+            color: #605e5c;
+        }
+
+        .time-entries {
+            border: 1px solid #edebe9;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .entry-header {
+            background: #faf9f8;
+            padding: 12px 20px;
+            border-bottom: 1px solid #edebe9;
+            display: grid;
+            grid-template-columns: 120px 100px 250px 1fr 120px;
+            gap: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #605e5c;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .time-entry {
+            display: grid;
+            grid-template-columns: 120px 100px 250px 1fr 120px;
+            gap: 20px;
+            padding: 12px 20px;
+            border-bottom: 1px solid #f3f2f1;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .time-entry:last-child {
+            border-bottom: none;
+        }
+
+        .time-entry:hover {
+            background: #faf9f8;
+        }
+
+        .entry-date {
+            font-weight: 600;
+            color: #323130;
+        }
+
+        .entry-duration {
+            font-weight: 600;
+            color: #0078d4;
+        }
+
+        .entry-ticket {
+            font-weight: 600;
+            color: #605e5c;
+        }
+
+        .entry-description {
+            color: #323130;
+        }
+
+        .entry-employee {
+            color: #605e5c;
+            font-size: 12px;
+        }
+
+        .status {
+            padding: 12px 20px;
+            border-left: 4px solid #0078d4;
+            background: #f3f2f1;
+            margin: 16px 20px;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .status.error {
+            border-left-color: #d13438;
+            background: #fdf3f4;
+            color: #a4262c;
+        }
+
+        .status.success {
+            border-left-color: #107c10;
+            background: #f3f9f3;
+            color: #0e5a0e;
+        }
+
+        .status.warning {
+            border-left-color: #ffaa44;
+            background: #fff8f1;
+            color: #8a6914;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #605e5c;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f2f1;
+            border-radius: 50%;
+            border-top-color: #0078d4;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #605e5c;
+        }
+
+        .no-data-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 768px) {
+            .overall-summary {
+                grid-template-columns: 1fr;
+            }
+            
+            .ticket-summary {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .buttons {
+                margin-left: 0;
+                justify-content: stretch;
+            }
+            
+            .btn {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>🕒 ZEP Time Tracker</h2>
+        </div>
+
+        <div class="controls">
+            <div class="filter-group">
+                <label for="ticketFilter">Ticket ID</label>
+                <input type="text" id="ticketFilter" placeholder="Filter by ticket ID">
+            </div>
+            
+            <div class="filter-group">
+                <label for="dateFromFilter">Date From</label>
+                <input type="date" id="dateFromFilter">
+            </div>
+            
+            <div class="filter-group">
+                <label for="dateToFilter">Date To</label>
+                <input type="date" id="dateToFilter">
+            </div>
+
+            <div class="buttons">
+                <button class="btn" id="clearFiltersBtn">Clear Filters</button>
+                <button class="btn" id="refreshBtn">Refresh</button>
+                <button class="btn primary" id="fetchBtn">Fetch Time Entries</button>
+            </div>
+        </div>
+
+        <div id="summarySection" class="summary-section" style="display: none;">
+            <div class="summary-header">
+                <h3>📊 Summary</h3>
+            </div>
+            
+            <div class="overall-summary">
+                <div class="summary-card">
+                    <h4>Total Actual Hours</h4>
+                    <div class="value" id="totalActualHours">0h</div>
+                    <div class="label">Across all tickets</div>
+                </div>
+                
+                <div class="summary-card">
+                    <h4>Total Planned Hours</h4>
+                    <div class="value" id="totalPlannedHours">0h</div>
+                    <div class="label">Estimated effort</div>
+                </div>
+                
+                <div class="summary-card">
+                    <h4>Progress</h4>
+                    <div class="value planned-vs-actual" id="progressPercentage">0%</div>
+                    <div class="label" id="progressLabel">Of planned time</div>
+                </div>
+                
+                <div class="summary-card">
+                    <h4>Time Entries</h4>
+                    <div class="value" id="totalEntries">0</div>
+                    <div class="label">Logged entries</div>
+                </div>
+            </div>
+
+            <div class="ticket-summaries" id="ticketSummaries"></div>
+        </div>
+
+        <div id="entriesSection" class="entries-section" style="display: none;">
+            <div class="entries-header">
+                <h3>📋 Time Entries</h3>
+                <span class="entries-count" id="entriesCount">0 entries</span>
+            </div>
+            
+            <div class="time-entries">
+                <div class="entry-header">
+                    <div>Date</div>
+                    <div>Duration</div>
+                    <div>Ticket</div>
+                    <div>Description</div>
+                    <div>Employee</div>
+                </div>
+                <div id="timeEntriesContainer"></div>
+            </div>
+        </div>
+
+        <div id="statusContainer"></div>
+        
+        <div id="loadingContainer" class="loading" style="display: none;">
+            <div class="loading-spinner"></div>
+            Loading time entries...
+        </div>
+    </div>
+
+    <script>
+        // This will be handled by the require.js script in the head
+        // The main application logic will be executed once SDK is loaded
+        
+        // Wait for the require.js SDK loading to complete
+        window.addEventListener('load', function() {
+            // Small delay to ensure SDK is fully loaded
+            setTimeout(function() {
+                if (typeof VSS !== 'undefined') {
+                    initializeExtension();
+                } else {
+                    console.error('VSS SDK not available');
+                }
+            }, 500);
+        });
+        
+        function initializeExtension() {
+            VSS.init({
+                explicitNotifyLoaded: true,
+                usePlatformStyles: true
+            });
+
+            VSS.ready(function() {
+                const workItemFormService = VSS.getService(VSS.ServiceIds.WorkItemFormService);
+                let currentWorkItemId = null;
+                let currentFilter = {};
+                let allTimeEntries = [];
+                let allTicketSummaries = [];
+
+                // Event listeners
+                document.getElementById('fetchBtn').addEventListener('click', fetchTimeEntries);
+                document.getElementById('refreshBtn').addEventListener('click', () => {
+                    clearFilters();
+                    fetchTimeEntries();
+                });
+                document.getElementById('clearFiltersBtn').addEventListener('click', clearFilters);
+                
+                // Filter change handlers
+                document.getElementById('ticketFilter').addEventListener('input', applyFilters);
+                document.getElementById('dateFromFilter').addEventListener('change', applyFilters);
+                document.getElementById('dateToFilter').addEventListener('change', applyFilters);
+
+                // Get current work item ID
+                workItemFormService.getId().then(function(id) {
+                    currentWorkItemId = id;
+                    console.log('Work Item ID:', id);
+                });
+
+                function clearFilters() {
+                    document.getElementById('ticketFilter').value = '';
+                    document.getElementById('dateFromFilter').value = '';
+                    document.getElementById('dateToFilter').value = '';
+                    currentFilter = {};
+                    applyFilters();
+                }
+
+                function applyFilters() {
+                    const ticketFilter = document.getElementById('ticketFilter').value.trim();
+                    const dateFromFilter = document.getElementById('dateFromFilter').value;
+                    const dateToFilter = document.getElementById('dateToFilter').value;
+
+                    currentFilter = {
+                        ticketId: ticketFilter || undefined,
+                        dateFrom: dateFromFilter || undefined,
+                        dateTo: dateToFilter || undefined
+                    };
+
+                    if (allTimeEntries.length > 0) {
+                        const filteredEntries = filterTimeEntries(allTimeEntries, currentFilter);
+                        const filteredSummaries = filterTicketSummaries(allTicketSummaries, filteredEntries);
+                        updateDisplay(filteredEntries, filteredSummaries);
+                    }
+                }
+
+                function filterTimeEntries(entries, filter) {
+                    return entries.filter(entry => {
+                        // Ticket ID filter (partial match)
+                        if (filter.ticketId && !entry.ticketId.toLowerCase().includes(filter.ticketId.toLowerCase())) {
+                            return false;
+                        }
+                        
+                        // Date range filter
+                        if (filter.dateFrom && entry.date < filter.dateFrom) {
+                            return false;
+                        }
+                        if (filter.dateTo && entry.date > filter.dateTo) {
+                            return false;
+                        }
+                        
+                        return true;
+                    });
+                }
+
+                function filterTicketSummaries(summaries, filteredEntries) {
+                    const ticketMap = new Map();
+                    
+                    // Recalculate summaries based on filtered entries
+                    summaries.forEach(summary => {
+                        ticketMap.set(summary.ticketId, {
+                            ...summary,
+                            actualHours: 0,
+                            entryCount: 0
+                        });
+                    });
+                    
+                    filteredEntries.forEach(entry => {
+                        const summary = ticketMap.get(entry.ticketId);
+                        if (summary) {
+                            summary.actualHours += entry.duration;
+                            summary.entryCount += 1;
+                        }
+                    });
+                    
+                    return Array.from(ticketMap.values());
+                }
+
+                async function fetchTimeEntries() {
+                    try {
+                        setLoading(true);
+                        showStatus('Fetching time entries...', 'info');
+
+                        // Get ZEP ticket IDs from work item
+                        const zepField = await workItemFormService.getFieldValue('Custom.ZEPTicketIDs');
+                        
+                        if (!zepField) {
+                            throw new Error('No ZEP Ticket IDs found in work item. Please add ticket IDs to the Custom.ZEPTicketIDs field.');
+                        }
+
+                        const ticketIds = zepField.split(/[,;\\n]/).map(id => id.trim()).filter(id => id);
+                        
+                        if (ticketIds.length === 0) {
+                            throw new Error('No valid ZEP Ticket IDs found.');
+                        }
+
+                        console.log('Fetching time entries for tickets:', ticketIds);
+
+                        // Fetch time entries and ticket details
+                        const { timeEntries, ticketSummaries } = await getTimeEntriesWithPagination(ticketIds, currentFilter);
+                        
+                        // Store for filtering
+                        allTimeEntries = timeEntries;
+                        allTicketSummaries = ticketSummaries;
+
+                        updateDisplay(timeEntries, ticketSummaries);
+                        showStatus(`Successfully loaded ${timeEntries.length} time entries from ${ticketSummaries.length} tickets`, 'success');
+
+                    } catch (error) {
+                        console.error('Error fetching time entries:', error);
+                        showStatus(error.message, 'error');
+                        hideDisplaySections();
+                    } finally {
+                        setLoading(false);
+                    }
+                }
+
+                async function getTimeEntriesWithPagination(ticketIds, filter = {}) {
+                    const allEntries = [];
+                    const ticketDetails = [];
+                    
+                    for (const ticketId of ticketIds) {
+                        try {
+                            // Apply ticket filter if specified
+                            if (filter.ticketId && !ticketId.toLowerCase().includes(filter.ticketId.toLowerCase())) {
+                                continue;
+                            }
+
+                            // Fetch ticket details for planned hours
+                            const ticketDetail = await getTicketDetails(ticketId);
+                            ticketDetails.push(ticketDetail);
+
+                            // Fetch time entries with pagination
+                            const ticketEntries = await getTimeEntriesForTicketWithPagination(ticketId, filter);
+                            allEntries.push(...ticketEntries);
+
+                        } catch (error) {
+                            console.error(`Failed to fetch data for ticket ${ticketId}:`, error);
+                            // Add fallback ticket details
+                            ticketDetails.push({
+                                id: ticketId,
+                                title: `Ticket ${ticketId}`,
+                                plannedHours: 0,
+                                description: 'Failed to load ticket details'
+                            });
+                        }
+                    }
+
+                    // Calculate per-ticket summaries
+                    const ticketSummaries = calculateTicketSummaries(allEntries, ticketDetails);
+
+                    return { timeEntries: allEntries, ticketSummaries };
+                }
+
+                async function getTicketDetails(ticketId) {
+                    try {
+                        const proxyUrl = 'https://zepextension.onrender.com/api/zep';
+                        const url = `${proxyUrl}/tickets/${ticketId}`;
+                        
+                        console.log(`🎫 Fetching ticket details for: ${ticketId}`);
+
+                        const response = await fetch(url, {
+                            method: 'GET',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json'
+                            },
+                            mode: 'cors',
+                            credentials: 'omit'
+                        });
+
+                        if (!response.ok) {
+                            if (response.status === 404) {
+                                console.warn(`⚠️ Ticket ${ticketId} not found, using default values`);
+                                return {
+                                    id: ticketId,
+                                    title: `Ticket ${ticketId}`,
+                                    plannedHours: 0,
+                                    description: 'Ticket details not available'
+                                };
+                            }
+                            throw new Error(`Failed to fetch ticket ${ticketId}: ${response.statusText}`);
+                        }
+
+                        const ticketData = await response.json();
+                        console.log(`📋 Ticket ${ticketId} details received:`, ticketData);
+
+                        return {
+                            id: ticketData.id.toString(),
+                            title: ticketData.title || `Ticket ${ticketId}`,
+                            plannedHours: ticketData.planned_hours || 0,
+                            description: ticketData.description,
+                            status: ticketData.status
+                        };
+
+                    } catch (error) {
+                        console.error(`❌ Failed to fetch ticket details for ${ticketId}:`, error);
+                        
+                        // Return fallback ticket details
+                        return {
+                            id: ticketId,
+                            title: `Ticket ${ticketId}`,
+                            plannedHours: 0,
+                            description: 'Failed to load ticket details'
+                        };
+                    }
+                }
+
+                async function getTimeEntriesForTicketWithPagination(ticketId, filter = {}) {
+                    const allEntries = [];
+                    let currentPage = 1;
+                    let hasMorePages = true;
+
+                    while (hasMorePages) {
+                        try {
+                            const proxyUrl = 'https://zepextension.onrender.com/api/zep';
+                            const url = `${proxyUrl}/attendances`;
+                            
+                            const params = new URLSearchParams({
+                                ticket_id: ticketId,
+                                limit: '100',
+                                page: currentPage.toString()
+                            });
+
+                            // Add filter parameters
+                            if (filter.dateFrom) {
+                                params.append('date_from', filter.dateFrom);
+                            }
+                            if (filter.dateTo) {
+                                params.append('date_to', filter.dateTo);
+                            }
+
+                            const fullUrl = `${url}?${params}`;
+                            console.log(`📄 Fetching page ${currentPage} for ticket ${ticketId}`);
+
+                            const response = await fetch(fullUrl, {
+                                method: 'GET',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'Content-Type': 'application/json'
+                                },
+                                mode: 'cors',
+                                credentials: 'omit'
+                            });
+
+                            if (!response.ok) {
+                                if (response.status === 401) {
+                                    throw new Error('Invalid API key. Please check ZEP credentials.');
+                                } else if (response.status === 403) {
+                                    throw new Error('Access forbidden. Check your API permissions.');
+                                } else if (response.status === 404) {
+                                    console.log(`No time entries found for ticket ${ticketId}`);
+                                    break;
+                                }
+                                
+                                const errorText = await response.text();
+                                throw new Error(`ZEP API error (${response.status}): ${errorText}`);
+                            }
+
+                            const data = await response.json();
+                            console.log(`📋 Page ${currentPage} - Entries received: ${data.data?.length || 0}`);
+                            
+                            if (data.data && Array.isArray(data.data)) {
+                                const pageEntries = data.data.map(item => ({
+                                    id: item.id.toString(),
+                                    ticketId: ticketId,
+                                    employeeId: item.employee_id,
+                                    employeeName: item.employee_id,
+                                    date: item.date,
+                                    startTime: item.from,
+                                    endTime: item.to,
+                                    duration: item.duration,
+                                    description: item.note || '',
+                                    project: item.project_id?.toString() || ticketId,
+                                    activity: item.activity_id || '',
+                                    billable: item.billable || false
+                                }));
+                                
+                                allEntries.push(...pageEntries);
+                            }
+
+                            // Check pagination
+                            if (data.meta) {
+                                console.log(`📊 Pagination - Current: ${data.meta.current_page}, Last: ${data.meta.last_page}, Total: ${data.meta.total}`);
+                                hasMorePages = data.meta.current_page < data.meta.last_page;
+                                currentPage++;
+                            } else {
+                                hasMorePages = false;
+                            }
+
+                        } catch (error) {
+                            console.error(`Error fetching page ${currentPage} for ticket ${ticketId}:`, error);
+                            hasMorePages = false;
+                        }
+                    }
+
+                    console.log(`✅ Pagination complete for ticket ${ticketId}! Total entries: ${allEntries.length}`);
+                    return allEntries;
+                }
+
+                function calculateTicketSummaries(timeEntries, ticketDetails) {
+                    const ticketMap = new Map();
+                    
+                    // Initialize summaries for all tickets
+                    ticketDetails.forEach(ticket => {
+                        ticketMap.set(ticket.id, {
+                            ticketId: ticket.id,
+                            plannedHours: ticket.plannedHours,
+                            actualHours: 0,
+                            entryCount: 0,
+                            ticketDetails: ticket
+                        });
+                    });
+                    
+                    // Aggregate time entries by ticket
+                    timeEntries.forEach(entry => {
+                        const existing = ticketMap.get(entry.ticketId) || {
+                            ticketId: entry.ticketId,
+                            plannedHours: 0,
+                            actualHours: 0,
+                            entryCount: 0
+                        };
+                        
+                        existing.actualHours += entry.duration;
+                        existing.entryCount += 1;
+                        
+                        ticketMap.set(entry.ticketId, existing);
+                    });
+                    
+                    return Array.from(ticketMap.values());
+                }
+
+                function updateDisplay(timeEntries, ticketSummaries) {
+                    updateSummarySection(timeEntries, ticketSummaries);
+                    updateTimeEntriesSection(timeEntries);
+                    
+                    // Show sections
+                    document.getElementById('summarySection').style.display = 'block';
+                    document.getElementById('entriesSection').style.display = 'block';
+                }
+
+                function updateSummarySection(timeEntries, ticketSummaries) {
+                    const totalActual = timeEntries.reduce((sum, entry) => sum + entry.duration, 0);
+                    const totalPlanned = ticketSummaries.reduce((sum, ticket) => sum + ticket.plannedHours, 0);
+                    const progress = totalPlanned > 0 ? (totalActual / totalPlanned) * 100 : 0;
+
+                    // Update overall summary
+                    document.getElementById('totalActualHours').textContent = formatDuration(totalActual);
+                    document.getElementById('totalPlannedHours').textContent = formatDuration(totalPlanned);
+                    document.getElementById('progressPercentage').textContent = `${Math.round(progress)}%`;
+                    document.getElementById('totalEntries').textContent = timeEntries.length.toString();
+
+                    // Update progress label based on percentage
+                    const progressLabel = document.getElementById('progressLabel');
+                    if (progress > 100) {
+                        progressLabel.textContent = 'Over planned time';
+                        progressLabel.style.color = '#d13438';
+                    } else if (progress > 80) {
+                        progressLabel.textContent = 'Near completion';
+                        progressLabel.style.color = '#ffaa44';
+                    } else {
+                        progressLabel.textContent = 'Of planned time';
+                        progressLabel.style.color = '#605e5c';
+                    }
+
+                    // Update ticket summaries
+                    const summariesContainer = document.getElementById('ticketSummaries');
+                    summariesContainer.innerHTML = '';
+
+                    if (ticketSummaries.length > 0) {
+                        ticketSummaries.forEach(summary => {
+                            const ticketDiv = document.createElement('div');
+                            ticketDiv.className = 'ticket-summary';
+                            
+                            ticketDiv.innerHTML = `
+                                <div class="ticket-info">
+                                    <div class="ticket-id">Ticket ${summary.ticketId}</div>
+                                    <div class="ticket-title">${summary.ticketDetails?.title || `Ticket ${summary.ticketId}`}</div>
+                                </div>
+                                <div class="ticket-hours">
+                                    <span class="actual-hours">${formatDuration(summary.actualHours)} actual</span>
+                                    <span class="planned-hours">${formatDuration(summary.plannedHours)} planned</span>
+                                    <span class="entries-count">${summary.entryCount} entries</span>
+                                </div>
+                            `;
+                            
+                            summariesContainer.appendChild(ticketDiv);
+                        });
+                    }
+                }
+
+                function updateTimeEntriesSection(timeEntries) {
+                    const container = document.getElementById('timeEntriesContainer');
+                    const countElement = document.getElementById('entriesCount');
+                    
+                    countElement.textContent = `${timeEntries.length} entries`;
+                    container.innerHTML = '';
+
+                    if (timeEntries.length === 0) {
+                        container.innerHTML = `
+                            <div class="no-data">
+                                <div class="no-data-icon">📭</div>
+                                <div>No time entries found</div>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    timeEntries
+                        .sort((a, b) => new Date(b.date) - new Date(a.date))
+                        .forEach(entry => {
+                            const entryDiv = document.createElement('div');
+                            entryDiv.className = 'time-entry';
+                            
+                            entryDiv.innerHTML = `
+                                <div class="entry-date">${formatDate(entry.date)}</div>
+                                <div class="entry-duration">${formatDuration(entry.duration)}</div>
+                                <div class="entry-ticket">Ticket ${entry.ticketId}</div>
+                                <div class="entry-description">${entry.description || 'No description'}</div>
+                                <div class="entry-employee">${entry.employeeId}</div>
+                            `;
+                            
+                            container.appendChild(entryDiv);
+                        });
+                }
+
+                function formatDuration(hours) {
+                    if (hours === 0) return '0h';
+                    if (hours < 1) return `${Math.round(hours * 60)}m`;
+                    
+                    const wholeHours = Math.floor(hours);
+                    const minutes = Math.round((hours - wholeHours) * 60);
+                    
+                    if (minutes === 0) return `${wholeHours}h`;
+                    return `${wholeHours}h ${minutes}m`;
+                }
+
+                function formatDate(dateString) {
+                    if (!dateString) return '';
+                    
+                    try {
+                        const date = new Date(dateString);
+                        return date.toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit', 
+                            year: 'numeric'
+                        });
+                    } catch (error) {
+                        return dateString;
+                    }
+                }
+
+                function setLoading(isLoading) {
+                    const loadingContainer = document.getElementById('loadingContainer');
+                    const fetchBtn = document.getElementById('fetchBtn');
+                    
+                    loadingContainer.style.display = isLoading ? 'block' : 'none';
+                    fetchBtn.disabled = isLoading;
+                    fetchBtn.textContent = isLoading ? 'Loading...' : 'Fetch Time Entries';
+                }
+
+                function showStatus(message, type = 'info') {
+                    const container = document.getElementById('statusContainer');
+                    container.innerHTML = `
+                        <div class="status ${type}">
+                            ${message}
+                        </div>
+                    `;
+                    
+                    // Auto-hide success messages after 5 seconds
+                    if (type === 'success') {
+                        setTimeout(() => {
+                            container.innerHTML = '';
+                        }, 5000);
+                    }
+                }
+
+                function hideDisplaySections() {
+                    document.getElementById('summarySection').style.display = 'none';
+                    document.getElementById('entriesSection').style.display = 'none';
+                }
+
+                // Initialize with current date range (last 30 days)
+                const today = new Date();
+                const thirtyDaysAgo = new Date(today);
+                thirtyDaysAgo.setDate(today.getDate() - 30);
+                
+                document.getElementById('dateFromFilter').value = thirtyDaysAgo.toISOString().split('T')[0];
+                document.getElementById('dateToFilter').value = today.toISOString().split('T')[0];
+
+                VSS.notifyLoadedAndReady();
+            });
+        }
+    </script>
+</body>
+</html> 

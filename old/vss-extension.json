@@ -1,0 +1,77 @@
+{
+  "manifestVersion": 1,
+  "id": "zep-time-tracker-browser",
+  "publisher": "GOpus",
+      "version": "1.0.50",
+  "name": "ZEP Time Tracker (Browser Edition)",
+  "description": "Proxy-based ZEP time tracking integration for Azure DevOps - no configuration required",
+  "public": false,
+  "targets": [
+    {
+      "id": "Microsoft.VisualStudio.Services"
+    }
+  ],
+  "scopes": [
+    "vso.work",
+    "vso.work_write"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/zep-extension"
+  },
+  "branding": {
+    "color": "#0078d4",
+    "theme": "light"
+  },
+  "categories": [
+    "Azure Boards"
+  ],
+  "tags": [
+    "ZEP",
+    "time tracking",
+    "work items",
+    "Zeiterfassung"
+  ],
+  "screenshots": [],
+  "content": {
+    "details": {
+      "path": "README.md"
+    }
+  },
+  "files": [
+    {
+      "path": "src",
+      "addressable": true
+    },
+    {
+      "path": "node_modules/azure-devops-extension-sdk",
+      "addressable": true,
+      "packagePath": "lib/SDK"
+    }
+  ],
+  "contributions": [
+    {
+      "id": "zep-time-tracker-workitem-group",
+      "type": "ms.vss-work-web.work-item-form-group",
+      "targets": [
+        "ms.vss-work-web.work-item-form"
+      ],
+      "properties": {
+        "name": "ZEP Time Tracker",
+        "uri": "src/workitem-group/workitem-group.html",
+        "height": 400,
+        "inputs": [
+          {
+            "id": "FieldName",
+            "name": "Field Name",
+            "description": "The name of the work item field",
+            "type": "WorkItemField",
+            "properties": {
+              "workItemFieldTypes": ["String"]
+            }
+          }
+        ]
+      }
+    }
+  ]
+} 
